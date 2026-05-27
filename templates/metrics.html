@@ -15,7 +15,7 @@
       is implicit "yes" on every shown detection — recall is 1.0 by
       construction and F1 collapses to <code>2P/(P+1)</code>; precision
       is the meaningful number.
-      &nbsp;<a href="{{ url_for('admin') }}?key={{ key }}">← admin</a>
+      &nbsp;<a href="{{ url_for('admin') }}">← admin</a>
     </p>
 
     <div class="select-banner">
@@ -69,7 +69,6 @@
     </table>
   </div>
 
-  <script>const ADMIN_KEY = {{ key | tojson }};</script>
   <script src="{{ url_for('static', filename='metrics.js') }}"></script>
 </body>
 </html>

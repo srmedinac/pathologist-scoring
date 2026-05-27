@@ -40,6 +40,11 @@ a { color: var(--accent); }
 .card h1 { margin: 0 0 8px; font-size: 20px; }
 
 .login { width: 380px; }
+.auth-strip {
+  background: #eef4fb; border: 1px solid #c8d8ed;
+  border-radius: 8px; padding: 8px 12px;
+  margin: 12px 0 4px; font-size: 13px; color: var(--ink);
+}
 .field-label { display: block; margin: 16px 0 6px; font-weight: 600; font-size: 14px; }
 .rater-list { display: flex; flex-direction: column; gap: 8px; }
 .rater-option {

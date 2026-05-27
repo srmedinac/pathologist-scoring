@@ -289,8 +289,22 @@ def current_rater():
     return session.get("rater")
 
 
+def cf_access_email():
+    """Email Cloudflare Access verified for this request, or '' if absent.
+
+    Set by the cloudflared tunnel after the user passes the Access policy.
+    Flask binds 127.0.0.1, so this header can only originate from cloudflared
+    on this host — no spoofing path from off-machine."""
+    return (request.headers.get("Cf-Access-Authenticated-User-Email") or "").lower()
+
+
 def is_admin():
-    return request.args.get("key") == CFG.get("admin_password")
+    """True iff the Access-verified email is on the admin_emails allowlist."""
+    email = cf_access_email()
+    if not email:
+        return False
+    allowed = {e.lower() for e in CFG.get("admin_emails", [])}
+    return email in allowed
 
 
 # ---- auth ----------------------------------------------------------------
@@ -298,30 +312,23 @@ def is_admin():
 def login():
     if request.method == "POST":
         rater = request.form.get("rater", "").strip()
-        pw = request.form.get("password", "")
-        if pw != CFG.get("access_password"):
-            return render_template("login.html", cfg=CFG, error="Wrong access code.")
         if rater not in CFG["raters"]:
-            return render_template("login.html", cfg=CFG, error="Pick your name.")
+            return render_template("login.html", cfg=CFG, error="Pick your name.",
+                                   auth_email=cf_access_email(), is_admin=is_admin())
         session["rater"] = rater
         return redirect(url_for("review"))
     if current_rater():
         return redirect(url_for("review"))
-    return render_template("login.html", cfg=CFG, error=None)
+    return render_template("login.html", cfg=CFG, error=None,
+                           auth_email=cf_access_email(), is_admin=is_admin())
 
 
 @app.route("/logout")
 def logout():
     session.pop("rater", None)
-    return redirect(url_for("login"))
-
-
-@app.route("/admin_login", methods=["POST"])
-def admin_login():
-    pw = request.form.get("password", "")
-    if pw == CFG.get("admin_password"):
-        return redirect(url_for("admin") + "?key=" + pw)
-    return render_template("login.html", cfg=CFG, error="Wrong admin code.")
+    # Also drop the Cloudflare Access session so the next visit re-prompts
+    # for the email/OTP instead of silently re-authenticating.
+    return redirect("/cdn-cgi/access/logout")
 
 
 @app.route("/review")
@@ -415,16 +422,14 @@ def admin():
     return render_template("admin.html", cfg=CFG, rows=rows,
                            manifest=MANIFEST,
                            kept_count=len(kept), skipped_count=len(SKIPPED),
-                           total_dets=total_dets,
-                           key=CFG.get("admin_password"))
+                           total_dets=total_dets)
 
 
 @app.route("/admin/metrics")
 def admin_metrics():
     if not is_admin():
         abort(401)
-    return render_template("metrics.html", cfg=CFG,
-                           key=CFG.get("admin_password"))
+    return render_template("metrics.html", cfg=CFG)
 
 
 @app.route("/admin/metrics/data")
@@ -457,8 +462,7 @@ def admin_csv(rater):
 def preview():
     if not is_admin():
         abort(401)
-    return render_template("preview.html", cfg=CFG, manifest=MANIFEST,
-                           key=CFG.get("admin_password"))
+    return render_template("preview.html", cfg=CFG, manifest=MANIFEST)
 
 
 @app.route("/preview_img/<patch_id>")
@@ -503,8 +507,7 @@ def preview_img(patch_id):
 def admin_curate():
     if not is_admin():
         abort(401)
-    return render_template("curate.html", cfg=CFG, manifest=MANIFEST,
-                           key=CFG.get("admin_password"))
+    return render_template("curate.html", cfg=CFG, manifest=MANIFEST)
 
 
 @app.route("/admin/curate/state")
@@ -553,5 +556,7 @@ if __name__ == "__main__":
         build_manifest(load_config(), force="--force" in sys.argv)
     else:
         port = int(os.environ.get("PORT", CFG.get("port", 8000)))
-        print("Mitosis review running on http://0.0.0.0:%d" % port)
-        app.run(host="0.0.0.0", port=port, threaded=True)
+        # Bind to localhost only — cloudflared (same machine) reaches us via
+        # 127.0.0.1; LAN clients are blocked from bypassing Cloudflare Access.
+        print("Mitosis review running on http://127.0.0.1:%d" % port)
+        app.run(host="127.0.0.1", port=port, threaded=True)

@@ -11,6 +11,14 @@
     <h1>{{ cfg.study_title }}</h1>
     <p class="muted">{{ cfg.instructions }}</p>
 
+    {% if auth_email %}
+      <div class="auth-strip">
+        Signed in as <b>{{ auth_email }}</b>
+        &middot;
+        <a href="{{ url_for('logout') }}">sign out</a>
+      </div>
+    {% endif %}
+
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
     <label class="field-label">Who are you?</label>
@@ -23,13 +31,13 @@
       {% endfor %}
     </div>
 
-    <label class="field-label" for="password">Access code</label>
-    <input type="password" id="password" name="password" autocomplete="off" required>
-
     <button type="submit" class="btn-primary">Start reviewing</button>
-    <button type="submit" class="btn-secondary"
-            formaction="{{ url_for('admin_login') }}"
-            formnovalidate>Admin →</button>
+
+    {% if is_admin %}
+      <p style="margin-top:14px; text-align:center">
+        <a href="{{ url_for('admin') }}">Admin dashboard →</a>
+      </p>
+    {% endif %}
   </form>
 </body>
 </html>

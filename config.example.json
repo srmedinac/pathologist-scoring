@@ -30,8 +30,7 @@
   "raters": ["rater_1", "rater_2", "rater_3"],
   "shuffle_per_rater": true,
 
-  "access_password": "CHANGE-ME",
-  "admin_password": "CHANGE-ME-ADMIN",
+  "admin_emails": ["you@example.com"],
   "secret_key": "CHANGE-ME-RANDOM-STRING",
   "port": 8000
 }

@@ -1,6 +1,5 @@
 (function () {
   "use strict";
-  const KEY = window.ADMIN_KEY;
   const grid = document.getElementById("grid");
   const stats = document.getElementById("stats");
   const cells = new Map();
@@ -21,7 +20,7 @@
       hoverPid = pid;
       const ndet = (cell.querySelector(".cell-ndet") || {}).textContent || "";
       magCap.innerHTML = `<b>${pid}</b><span>${ndet}</span>`;
-      magImg.src = `/preview_img/${pid}?key=${encodeURIComponent(KEY)}&w=860`;
+      magImg.src = `/preview_img/${pid}?w=860`;
     }
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
@@ -61,8 +60,7 @@
   });
 
   function api(path, opts) {
-    const sep = path.includes("?") ? "&" : "?";
-    return fetch(path + sep + "key=" + encodeURIComponent(KEY), opts || {})
+    return fetch(path, opts || {})
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
   }
 

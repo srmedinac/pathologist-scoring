@@ -19,7 +19,7 @@
     <div class="preview-grid">
       {% for p in manifest.patches %}
       <figure class="preview-cell">
-        <img loading="lazy" src="{{ url_for('preview_img', patch_id=p.patch_id) }}?key={{ key }}">
+        <img loading="lazy" src="{{ url_for('preview_img', patch_id=p.patch_id) }}">
         <figcaption>{{ p.patch_id }} · {{ p.detections|length }} det · {{ p.image }}</figcaption>
       </figure>
       {% endfor %}

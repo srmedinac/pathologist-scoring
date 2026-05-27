@@ -19,8 +19,7 @@ function saveGT(v) {
 
 async function refresh() {
   const gt = $("gt-select").value || loadGT();
-  const url = "/admin/metrics/data?key=" + encodeURIComponent(ADMIN_KEY)
-              + (gt ? "&gt=" + encodeURIComponent(gt) : "");
+  const url = "/admin/metrics/data" + (gt ? "?gt=" + encodeURIComponent(gt) : "");
   try {
     const r = await fetch(url, {cache: "no-store"});
     if (!r.ok) throw new Error("HTTP " + r.status);

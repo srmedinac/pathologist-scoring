@@ -18,7 +18,7 @@
       <strong>Selection:</strong> {{ kept_count }} kept · {{ skipped_count }} skipped &nbsp;·&nbsp;
       pathologists see <b>{{ total_dets }}</b> detection{% if total_dets != 1 %}s{% endif %}
       &nbsp;·&nbsp;
-      <a href="{{ url_for('admin_curate') }}?key={{ key }}">curate the selection →</a>
+      <a href="{{ url_for('admin_curate') }}">curate the selection →</a>
     </div>
 
     <table class="data-table">
@@ -33,16 +33,16 @@
                  style="width: {{ r.pct }}%"></div></div>
             <span class="muted">{{ r.pct }}%</span>
           </td>
-          <td><a href="{{ url_for('admin_csv', rater=r.rater) }}?key={{ key }}">download</a></td>
+          <td><a href="{{ url_for('admin_csv', rater=r.rater) }}">download</a></td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
 
     <p>
-      <a href="{{ url_for('admin_metrics') }}?key={{ key }}">→ Live metrics dashboard (F1, κ)</a>
+      <a href="{{ url_for('admin_metrics') }}">→ Live metrics dashboard (F1, κ)</a>
       &nbsp;·&nbsp;
-      <a href="{{ url_for('preview') }}?key={{ key }}">Check detection boxes (preview)</a>
+      <a href="{{ url_for('preview') }}">Check detection boxes (preview)</a>
     </p>
   </div>
 </body>
