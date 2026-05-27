@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Curate — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  <div class="card wide">
+    <div class="curate-head">
+      <div>
+        <h1>Curation</h1>
+        <p class="muted">
+          Click any tile to <b>skip</b> it (or click again to keep it). Auto-saves
+          on every click. Pathologists will only see the kept ones.
+        </p>
+      </div>
+      <div class="curate-actions">
+        <a class="link-btn" href="{{ url_for('admin') }}?key={{ key }}">← admin</a>
+        <button class="btn-secondary curate-btn" id="bulk-keep">Keep all</button>
+        <button class="btn-secondary curate-btn" id="bulk-skip">Skip all</button>
+      </div>
+    </div>
+
+    <div class="curate-stats" id="stats">loading…</div>
+
+    <div class="curate-grid" id="grid">
+      {% for p in manifest.patches %}
+      <figure class="curate-cell" data-pid="{{ p.patch_id }}">
+        <img loading="lazy" draggable="false"
+             src="{{ url_for('preview_img', patch_id=p.patch_id) }}?key={{ key }}&w=320">
+        <figcaption>
+          <span class="cell-id">{{ p.patch_id }}</span>
+          <span class="cell-ndet">{{ p.detections|length }} det</span>
+        </figcaption>
+        <div class="cell-mark">SKIPPED</div>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>window.ADMIN_KEY = {{ key|tojson }};</script>
+  <script src="{{ url_for('static', filename='curate.js') }}"></script>
+</body>
+</html>

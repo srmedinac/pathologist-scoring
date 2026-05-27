@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="centered">
+  <form class="card login" method="post">
+    <h1>{{ cfg.study_title }}</h1>
+    <p class="muted">{{ cfg.instructions }}</p>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <label class="field-label">Who are you?</label>
+    <div class="rater-list">
+      {% for r in cfg.raters %}
+      <label class="rater-option">
+        <input type="radio" name="rater" value="{{ r }}" required>
+        <span>{{ r }}</span>
+      </label>
+      {% endfor %}
+    </div>
+
+    <label class="field-label" for="password">Access code</label>
+    <input type="password" id="password" name="password" autocomplete="off" required>
+
+    <button type="submit" class="btn-primary">Start reviewing</button>
+  </form>
+</body>
+</html>

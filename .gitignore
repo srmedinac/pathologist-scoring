@@ -1,0 +1,25 @@
+# Project-specific configuration (passwords, paths) — copy from config.example.json
+config.json
+
+# Generated study data (specific to one deployment)
+manifest.json
+results/
+URL.txt
+
+# Runtime logs
+*.log
+*.tmp
+
+# Generated caches
+thumb_cache/
+web_cache/
+__pycache__/
+*.pyc
+
+# Synthetic / local test data
+data/patches/
+data/truth.json
+
+# OS junk
+.DS_Store
+.cache/

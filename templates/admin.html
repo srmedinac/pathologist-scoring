@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  <div class="card wide">
+    <h1>Study progress</h1>
+    <p class="muted">
+      {{ manifest.n_patches }} candidate tiles · {{ manifest.n_detections }} candidate detections ·
+      mode: {{ manifest.detection_mode }} · seed {{ manifest.seed }}
+    </p>
+
+    <div class="select-banner">
+      <strong>Selection:</strong> {{ kept_count }} kept · {{ skipped_count }} skipped &nbsp;·&nbsp;
+      pathologists see <b>{{ total_dets }}</b> detection{% if total_dets != 1 %}s{% endif %}
+      &nbsp;·&nbsp;
+      <a href="{{ url_for('admin_curate') }}?key={{ key }}">curate the selection →</a>
+    </div>
+
+    <table class="data-table">
+      <thead><tr><th>Rater</th><th>Reviewed</th><th>Progress</th><th>CSV</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.rater }}</td>
+          <td>{{ r.done }} / {{ r.total }}</td>
+          <td>
+            <div class="progress-track small"><div class="progress-fill"
+                 style="width: {{ r.pct }}%"></div></div>
+            <span class="muted">{{ r.pct }}%</span>
+          </td>
+          <td><a href="{{ url_for('admin_csv', rater=r.rater) }}?key={{ key }}">download</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <p><a href="{{ url_for('preview') }}?key={{ key }}">→ Check detection boxes (preview)</a></p>
+  </div>
+</body>
+</html>

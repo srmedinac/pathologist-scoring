@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detection preview — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  <div class="card wide">
+    <h1>Detection preview</h1>
+    <p class="muted">
+      Every sampled patch with its resolved detections drawn in <b>red</b> and
+      numbered. Confirm these match the model's boxes before starting the study.
+      If they are wrong, tune the <code>green</code> block in
+      <code>config.json</code> (or supply a coordinates file) and rebuild the
+      manifest. {{ manifest.n_patches }} patches · {{ manifest.n_detections }} detections.
+    </p>
+    <div class="preview-grid">
+      {% for p in manifest.patches %}
+      <figure class="preview-cell">
+        <img loading="lazy" src="{{ url_for('preview_img', patch_id=p.patch_id) }}?key={{ key }}">
+        <figcaption>{{ p.patch_id }} · {{ p.detections|length }} det · {{ p.image }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "study_title": "Detection Review",
+  "instructions": "Each image is a patch. The highlighted box marks a candidate detected by an automated model. Decide whether the highlighted object is a true positive.",
+
+  "patches_dir": "data/patches",
+  "detection_mode": "auto",
+  "coords_csv": "",
+  "coords_root": "",
+  "tiles_subdir": "tiles",
+
+  "n_patches": 500,
+  "seed": 1234,
+  "image_extensions": [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"],
+
+  "green": {
+    "hue_min": 35,
+    "hue_max": 95,
+    "sat_min": 60,
+    "val_min": 60,
+    "close_iter": 1,
+    "min_box_px": 14,
+    "max_box_frac": 0.97,
+    "min_rectangularity": 0.75,
+    "max_inner_fill": 0.35,
+    "max_aspect": 8.0,
+    "merge_iou": 0.85
+  },
+
+  "answer_options": ["yes", "no", "unsure"],
+  "raters": ["rater_1", "rater_2", "rater_3"],
+  "shuffle_per_rater": true,
+
+  "access_password": "CHANGE-ME",
+  "admin_password": "CHANGE-ME-ADMIN",
+  "secret_key": "CHANGE-ME-RANDOM-STRING",
+  "port": 8000
+}
