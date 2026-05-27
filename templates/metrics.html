@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metrics — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  <div class="card wide">
+    <h1>Live metrics</h1>
+    <p class="muted">
+      Auto-refreshes every 5 s while raters submit answers.
+      The detector proposed every reviewed candidate, so model prediction
+      is implicit "yes" on every shown detection — recall is 1.0 by
+      construction and F1 collapses to <code>2P/(P+1)</code>; precision
+      is the meaningful number.
+      &nbsp;<a href="{{ url_for('admin') }}?key={{ key }}">← admin</a>
+    </p>
+
+    <div class="select-banner">
+      <label>
+        <strong>Ground truth for F1:</strong>
+        <select id="gt-select">
+          <option value="">— pick a rater —</option>
+        </select>
+      </label>
+      <span class="muted" id="updated" style="float:right"></span>
+    </div>
+
+    <h2 class="metrics-h2">Headline — model vs. ground truth</h2>
+    <div id="headline-box" class="headline">
+      Pick a ground-truth rater above to compute F1.
+    </div>
+
+    <h2 class="metrics-h2">Model performance against each rater</h2>
+    <p class="muted">Each row treats that rater as the reference frame.</p>
+    <table class="data-table">
+      <thead>
+        <tr><th>Rater</th><th>n&nbsp;(yes/no)</th><th>TP</th><th>FP</th><th>FN</th>
+            <th>Precision</th><th>Recall</th><th>F1</th><th>"unsure"</th></tr>
+      </thead>
+      <tbody id="f1-rows"></tbody>
+    </table>
+
+    <h2 class="metrics-h2">Pairwise Cohen's κ</h2>
+    <p class="muted">
+      Rater↔rater agreement on items both have labelled.
+      Rows against <code>model</code> are 0 by construction (model has no
+      variance: always predicts "yes"); shown for completeness.
+    </p>
+    <table class="data-table">
+      <thead>
+        <tr><th>Pair</th><th>κ (yes/no)</th><th>κ (all categories)</th>
+            <th>n common</th></tr>
+      </thead>
+      <tbody id="pair-rows"></tbody>
+    </table>
+
+    <h2 class="metrics-h2">Fleiss' κ across active raters</h2>
+    <div id="fleiss-box" class="muted">—</div>
+
+    <h2 class="metrics-h2">Label distributions</h2>
+    <table class="data-table">
+      <thead>
+        <tr><th>Rater</th><th>n</th><th>yes</th><th>no</th><th>unsure</th></tr>
+      </thead>
+      <tbody id="dist-rows"></tbody>
+    </table>
+  </div>
+
+  <script>const ADMIN_KEY = {{ key | tojson }};</script>
+  <script src="{{ url_for('static', filename='metrics.js') }}"></script>
+</body>
+</html>

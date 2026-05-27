@@ -7,6 +7,10 @@
   let zoom = 3.0;
   let shownAt = 0;
   const BASE_W = Math.min(760, Math.max(420, window.innerWidth - 80));
+  const BOX_KEY = "mitosis_show_box";
+  if (localStorage.getItem(BOX_KEY) === "0") {
+    $("box-toggle").checked = false;
+  }
 
   function api(url, opts) {
     return fetch(url, opts).then((r) => {
@@ -92,7 +96,8 @@
     const f = it.bbox_frac;
     const hl = $("highlight");
     const dims = document.querySelectorAll(".dim");
-    if (!f) {
+    const showBox = $("box-toggle").checked;
+    if (!f || !showBox) {
       hl.style.display = "none";
       dims.forEach((d) => (d.style.display = "none"));
       return;
@@ -167,6 +172,10 @@
   $("help-btn").addEventListener("click", () =>
     $("help-box").classList.toggle("hidden"));
   $("dim-toggle").addEventListener("change", positionHighlight);
+  $("box-toggle").addEventListener("change", () => {
+    localStorage.setItem(BOX_KEY, $("box-toggle").checked ? "1" : "0");
+    positionHighlight();
+  });
   $("review-again").addEventListener("click", () => {
     $("done-overlay").classList.add("hidden");
     S.idx = 0;
@@ -187,6 +196,12 @@
     if (k === "arrowright") { go(1); e.preventDefault(); return; }
     if (k === "+" || k === "=") { zoomBy(1); e.preventDefault(); return; }
     if (k === "-" || k === "_") { zoomBy(-1); e.preventDefault(); return; }
+    if (k === "b") {
+      const t = $("box-toggle");
+      t.checked = !t.checked;
+      t.dispatchEvent(new Event("change"));
+      e.preventDefault(); return;
+    }
     for (const opt of S.options) {
       const m = META[opt] || { key: opt[0] };
       if (k === m.key) { answer(opt); e.preventDefault(); return; }

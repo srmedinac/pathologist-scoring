@@ -23,6 +23,7 @@ from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_file, session, url_for)
 
 import boxes
+import metrics
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -315,6 +316,14 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/admin_login", methods=["POST"])
+def admin_login():
+    pw = request.form.get("password", "")
+    if pw == CFG.get("admin_password"):
+        return redirect(url_for("admin") + "?key=" + pw)
+    return render_template("login.html", cfg=CFG, error="Wrong admin code.")
+
+
 @app.route("/review")
 def review():
     if not current_rater():
@@ -408,6 +417,30 @@ def admin():
                            kept_count=len(kept), skipped_count=len(SKIPPED),
                            total_dets=total_dets,
                            key=CFG.get("admin_password"))
+
+
+@app.route("/admin/metrics")
+def admin_metrics():
+    if not is_admin():
+        abort(401)
+    return render_template("metrics.html", cfg=CFG,
+                           key=CFG.get("admin_password"))
+
+
+@app.route("/admin/metrics/data")
+def admin_metrics_data():
+    if not is_admin():
+        abort(401)
+    kept_ids = {p["patch_id"] for p in MANIFEST["patches"]
+                if p["patch_id"] not in SKIPPED}
+    gt = request.args.get("gt") or None
+    # snapshot under lock — avoids racing concurrent api_answer writes
+    with _lock:
+        snapshot = {r: dict(RESULTS.get(r, {})) for r in CFG["raters"]}
+    payload = metrics.compute(snapshot, CFG["raters"], CFG["answer_options"],
+                              kept_ids=kept_ids, gt_rater=gt)
+    payload["server_time"] = now_iso()
+    return jsonify(payload)
 
 
 @app.route("/admin/results/<rater>.csv")

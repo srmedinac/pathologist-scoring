@@ -6,9 +6,13 @@ manifest.json
 results/
 URL.txt
 
-# Runtime logs
+# Runtime logs (including rotated copies like tunnel.log.old, app.log.1)
 *.log
+*.log.*
 *.tmp
+
+# Ad-hoc analysis scratch (one-off CLI utilities not part of the app)
+scoring.py
 
 # Generated caches
 thumb_cache/

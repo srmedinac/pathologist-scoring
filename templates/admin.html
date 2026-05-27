@@ -39,7 +39,11 @@
       </tbody>
     </table>
 
-    <p><a href="{{ url_for('preview') }}?key={{ key }}">→ Check detection boxes (preview)</a></p>
+    <p>
+      <a href="{{ url_for('admin_metrics') }}?key={{ key }}">→ Live metrics dashboard (F1, κ)</a>
+      &nbsp;·&nbsp;
+      <a href="{{ url_for('preview') }}?key={{ key }}">Check detection boxes (preview)</a>
+    </p>
   </div>
 </body>
 </html>

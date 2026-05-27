@@ -27,6 +27,9 @@
     <input type="password" id="password" name="password" autocomplete="off" required>
 
     <button type="submit" class="btn-primary">Start reviewing</button>
+    <button type="submit" class="btn-secondary"
+            formaction="{{ url_for('admin_login') }}"
+            formnovalidate>Admin →</button>
   </form>
 </body>
 </html>
