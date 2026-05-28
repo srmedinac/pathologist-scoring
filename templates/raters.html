@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Raters — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  <div class="card wide">
+    <h1>Raters</h1>
+    <p class="muted">
+      Bind each rater's name to the email Cloudflare Access verifies for
+      them. Bound raters skip the radio picker — they log in directly as
+      themselves. Unbound raters fall back to the picker.
+      &nbsp;<a href="{{ url_for('admin') }}">← admin</a>
+    </p>
+
+    <div class="cf-reminder">
+      <strong>⚠ Don't forget Cloudflare:</strong>
+      after adding or changing an email here, also add it to your
+      <a href="https://one.dash.cloudflare.com/?to=/:account/access/apps"
+         target="_blank" rel="noopener">Cloudflare Access Allow policy</a>.
+      Otherwise that email can't reach this app at all.
+    </div>
+
+    <table class="data-table" id="raters-table">
+      <thead>
+        <tr><th>Rater</th><th>Email</th><th>Answers</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr data-name="{{ r.name }}">
+          <td><b>{{ r.name }}</b></td>
+          <td>
+            <input class="email-input" type="email" value="{{ r.email }}"
+                   placeholder="(unbound — picker fallback)">
+          </td>
+          <td>{{ r.answers }}</td>
+          <td>
+            <button class="row-save">Save</button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 class="rater-h2">Add new rater</h2>
+    <p class="muted">
+      Append-only — once a rater has answers, their name and shuffle order
+      are frozen (the per-rater seed depends on their position in the list).
+      Pick a short, lowercase, alphanumeric name (used as the
+      <code>results_&lt;name&gt;.csv</code> filename).
+    </p>
+    <form id="add-form" class="add-rater">
+      <div>
+        <label class="field-label">Name</label>
+        <input type="text" id="new-name" required
+               pattern="[a-z0-9_]+" minlength="2"
+               placeholder="e.g. naoto">
+      </div>
+      <div>
+        <label class="field-label">Email</label>
+        <input type="email" id="new-email" required
+               placeholder="naoto@example.org">
+      </div>
+      <button type="submit">Add rater</button>
+    </form>
+
+    <p id="msg" class="rater-msg"></p>
+  </div>
+
+  <script src="{{ url_for('static', filename='raters.js') }}"></script>
+</body>
+</html>

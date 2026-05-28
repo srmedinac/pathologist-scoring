@@ -244,6 +244,43 @@ kbd {
 .curate-cell.skipped img { filter: grayscale(.85) brightness(.62); }
 .curate-cell.skipped .cell-mark { display: block; }
 
+/* ---- manage raters ---- */
+.cf-reminder {
+  background: #fff7e0; border: 1px solid #ecd9a3;
+  border-radius: 8px; padding: 11px 14px; margin: 14px 0 18px;
+  font-size: 14px;
+}
+#raters-table .email-input,
+.add-rater input[type=text],
+.add-rater input[type=email] {
+  width: 100%; padding: 7px 10px; font-size: 14px;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+#raters-table td { vertical-align: middle; }
+#raters-table .row-save {
+  padding: 7px 14px; font-size: 13px;
+  border: 1px solid var(--line); background: #fff; border-radius: 6px;
+  cursor: pointer;
+}
+#raters-table .row-save:hover { border-color: var(--accent); color: var(--accent); }
+.rater-h2 { margin: 28px 0 6px; font-size: 16px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.add-rater {
+  display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.add-rater > div { display: flex; flex-direction: column; min-width: 180px; }
+.add-rater .field-label { margin: 0 0 4px; }
+.add-rater button {
+  padding: 9px 18px; font-size: 14px; font-weight: 600;
+  border: none; border-radius: 6px; background: var(--accent); color: #fff;
+  cursor: pointer;
+}
+.add-rater button:disabled { opacity: .5; cursor: default; }
+.rater-msg { margin-top: 14px; font-size: 14px; min-height: 1.2em; }
+.rater-msg.ok  { color: var(--yes); }
+.rater-msg.err { color: var(--no); }
+
 /* ---- metrics dashboard ---- */
 .metrics-h2 {
   margin: 26px 0 6px; font-size: 16px;

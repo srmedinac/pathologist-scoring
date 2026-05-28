@@ -49,6 +49,19 @@ def load_config():
         return json.load(fh)
 
 
+def save_config(new_cfg):
+    """Atomically write config.json (temp + rename) and refresh CFG.
+
+    Callers should hold _lock to serialise the read-modify-write."""
+    tmp = CONFIG_PATH + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(new_cfg, fh, indent=2)
+        fh.write("\n")
+    os.replace(tmp, CONFIG_PATH)
+    global CFG
+    CFG = new_cfg
+
+
 # --------------------------------------------------------------------------
 # manifest
 # --------------------------------------------------------------------------
@@ -307,20 +320,42 @@ def is_admin():
     return email in allowed
 
 
+def rater_for_email(email):
+    """Rater name that this CF-Access-verified email is bound to, or None.
+
+    Used to bypass the radio picker for mapped raters."""
+    if not email:
+        return None
+    return (CFG.get("rater_emails") or {}).get(email.lower())
+
+
 # ---- auth ----------------------------------------------------------------
 @app.route("/", methods=["GET", "POST"])
 def login():
+    email = cf_access_email()
+    auto_rater = rater_for_email(email)
+
     if request.method == "POST":
         rater = request.form.get("rater", "").strip()
         if rater not in CFG["raters"]:
             return render_template("login.html", cfg=CFG, error="Pick your name.",
-                                   auth_email=cf_access_email(), is_admin=is_admin())
+                                   auth_email=email, is_admin=is_admin(),
+                                   auto_rater=auto_rater)
         session["rater"] = rater
         return redirect(url_for("review"))
+
     if current_rater():
         return redirect(url_for("review"))
+
+    # Email is bound to a rater AND user isn't also an admin who might want
+    # to choose between /review and /admin → jump straight to /review.
+    if auto_rater and not is_admin():
+        session["rater"] = auto_rater
+        return redirect(url_for("review"))
+
     return render_template("login.html", cfg=CFG, error=None,
-                           auth_email=cf_access_email(), is_admin=is_admin())
+                           auth_email=email, is_admin=is_admin(),
+                           auto_rater=auto_rater)
 
 
 @app.route("/logout")
@@ -446,6 +481,86 @@ def admin_metrics_data():
                               kept_ids=kept_ids, gt_rater=gt)
     payload["server_time"] = now_iso()
     return jsonify(payload)
+
+
+@app.route("/admin/raters")
+def admin_raters():
+    if not is_admin():
+        abort(401)
+    emails = CFG.get("rater_emails") or {}
+    name_to_email = {v: k for k, v in emails.items()}
+    rows = [{
+        "name": r,
+        "email": name_to_email.get(r, ""),
+        "answers": len(RESULTS.get(r, {})),
+    } for r in CFG["raters"]]
+    return render_template("raters.html", cfg=CFG, rows=rows)
+
+
+def _normalise_rater_name(n):
+    return (n or "").strip().lower()
+
+
+def _normalise_email(e):
+    return (e or "").strip().lower()
+
+
+@app.route("/admin/raters/add", methods=["POST"])
+def admin_raters_add():
+    if not is_admin():
+        abort(401)
+    data = request.get_json(force=True) or {}
+    name = _normalise_rater_name(data.get("name"))
+    email = _normalise_email(data.get("email"))
+
+    if not name or not name.replace("_", "").isalnum():
+        return jsonify(error="name must be alphanumeric / underscore only"), 400
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify(error="not a valid email"), 400
+
+    with _lock:
+        fresh = load_config()
+        if name in fresh["raters"]:
+            return jsonify(error="rater '%s' already exists" % name), 400
+        if email in (fresh.get("rater_emails") or {}):
+            return jsonify(
+                error="email already mapped to '%s'" % fresh["rater_emails"][email]
+            ), 400
+        fresh["raters"].append(name)
+        fresh.setdefault("rater_emails", {})[email] = name
+        save_config(fresh)
+        RESULTS.setdefault(name, {})
+    return jsonify(ok=True)
+
+
+@app.route("/admin/raters/email", methods=["POST"])
+def admin_raters_set_email():
+    """Set/clear the email bound to an existing rater."""
+    if not is_admin():
+        abort(401)
+    data = request.get_json(force=True) or {}
+    name = _normalise_rater_name(data.get("name"))
+    email = _normalise_email(data.get("email"))
+
+    if name not in CFG["raters"]:
+        return jsonify(error="unknown rater"), 400
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        return jsonify(error="not a valid email"), 400
+
+    with _lock:
+        fresh = load_config()
+        emails = fresh.setdefault("rater_emails", {})
+        # drop any previous mapping pointing at this rater
+        for k in [k for k, v in emails.items() if v == name]:
+            del emails[k]
+        if email:
+            if email in emails:
+                return jsonify(
+                    error="email already mapped to '%s'" % emails[email]
+                ), 400
+            emails[email] = name
+        save_config(fresh)
+    return jsonify(ok=True)
 
 
 @app.route("/admin/results/<rater>.csv")

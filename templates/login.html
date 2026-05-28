@@ -7,6 +7,27 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="centered">
+
+{# Admin who isn't bound to a rater → no picker, just a clear admin landing #}
+{% if is_admin and not auto_rater %}
+  <div class="card login">
+    <h1>{{ cfg.study_title }}</h1>
+    <p class="muted">You're signed in as an admin for this study.</p>
+
+    {% if auth_email %}
+      <div class="auth-strip">
+        Signed in as <b>{{ auth_email }}</b>
+        &middot; <a href="{{ url_for('logout') }}">sign out</a>
+      </div>
+    {% endif %}
+
+    <a href="{{ url_for('admin') }}" class="btn-primary"
+       style="display:block; text-align:center; text-decoration:none; margin-top:20px">
+      Admin dashboard →
+    </a>
+  </div>
+
+{% else %}
   <form class="card login" method="post">
     <h1>{{ cfg.study_title }}</h1>
     <p class="muted">{{ cfg.instructions }}</p>
@@ -14,8 +35,7 @@
     {% if auth_email %}
       <div class="auth-strip">
         Signed in as <b>{{ auth_email }}</b>
-        &middot;
-        <a href="{{ url_for('logout') }}">sign out</a>
+        &middot; <a href="{{ url_for('logout') }}">sign out</a>
       </div>
     {% endif %}
 
@@ -25,7 +45,8 @@
     <div class="rater-list">
       {% for r in cfg.raters %}
       <label class="rater-option">
-        <input type="radio" name="rater" value="{{ r }}" required>
+        <input type="radio" name="rater" value="{{ r }}" required
+               {% if r == auto_rater %}checked{% endif %}>
         <span>{{ r }}</span>
       </label>
       {% endfor %}
@@ -39,5 +60,7 @@
       </p>
     {% endif %}
   </form>
+{% endif %}
+
 </body>
 </html>
