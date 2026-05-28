@@ -278,6 +278,14 @@ CFG = load_config()
 app = Flask(__name__)
 app.secret_key = CFG.get("secret_key", "dev-secret")
 
+
+@app.context_processor
+def inject_auth():
+    """Expose the CF-Access-verified email + admin flag to every template
+    so the auth pill (sign-out link) can be rendered without each route
+    threading it through."""
+    return {"auth_email": cf_access_email(), "is_admin": is_admin()}
+
 if not os.path.exists(MANIFEST_PATH):
     print("No manifest.json found - run:  python app.py build")
     MANIFEST = {"patches": [], "n_patches": 0, "n_detections": 0}

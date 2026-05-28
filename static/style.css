@@ -244,6 +244,14 @@ kbd {
 .curate-cell.skipped img { filter: grayscale(.85) brightness(.62); }
 .curate-cell.skipped .cell-mark { display: block; }
 
+/* ---- admin-page auth strip (sign-out pill above each card) ---- */
+.page-auth {
+  max-width: 1100px; margin: 0 auto 14px;
+  text-align: right; font-size: 13px; color: var(--muted);
+}
+.page-auth b { color: var(--ink); }
+.page-auth a { margin-left: 6px; }
+
 /* ---- manage raters ---- */
 .cf-reminder {
   background: #fff7e0; border: 1px solid #ecd9a3;

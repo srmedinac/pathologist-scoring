@@ -7,6 +7,13 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="page">
+  {% if auth_email %}
+  <div class="page-auth">
+    Signed in as <b>{{ auth_email }}</b>
+    &middot;
+    <a href="{{ url_for('logout') }}">sign out</a>
+  </div>
+  {% endif %}
   <div class="card wide">
     <div class="curate-head">
       <div>
