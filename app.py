@@ -368,10 +368,14 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.pop("rater", None)
-    # Also drop the Cloudflare Access session so the next visit re-prompts
-    # for the email/OTP instead of silently re-authenticating.
-    return redirect("/cdn-cgi/access/logout")
+    # Clear *all* Flask session data (not just 'rater') and end the
+    # Cloudflare Access session too. The ?returnTo=/ bounces the user
+    # straight back to the app root so the next OTP cycle runs on a
+    # clean origin URL — CF's standalone "signed out" page can
+    # occasionally leave the One-Time-PIN provider's state machine in
+    # a half-cleared state on the immediate next sign-in attempt.
+    session.clear()
+    return redirect("/cdn-cgi/access/logout?returnTo=/")
 
 
 @app.route("/review")
