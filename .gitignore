@@ -5,6 +5,7 @@ config.json
 manifest.json
 results/
 URL.txt
+logo_url.txt
 
 # Runtime logs (including rotated copies like tunnel.log.old, app.log.1)
 *.log
