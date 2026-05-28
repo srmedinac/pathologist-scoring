@@ -35,13 +35,15 @@
 
     <h2 class="metrics-h2">Model performance against each rater</h2>
     <p class="muted">Each row treats that rater as the reference frame.</p>
-    <table class="data-table">
-      <thead>
-        <tr><th>Rater</th><th>n&nbsp;(yes/no)</th><th>TP</th><th>FP</th><th>FN</th>
-            <th>Precision</th><th>Recall</th><th>F1</th><th>"unsure"</th></tr>
-      </thead>
-      <tbody id="f1-rows"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Rater</th><th>n&nbsp;(yes/no)</th><th>TP</th><th>FP</th><th>FN</th>
+              <th>Precision</th><th>Recall</th><th>F1</th><th>"unsure"</th></tr>
+        </thead>
+        <tbody id="f1-rows"></tbody>
+      </table>
+    </div>
 
     <h2 class="metrics-h2">Pairwise Cohen's κ</h2>
     <p class="muted">
@@ -49,24 +51,28 @@
       Rows against <code>model</code> are 0 by construction (model has no
       variance: always predicts "yes"); shown for completeness.
     </p>
-    <table class="data-table">
-      <thead>
-        <tr><th>Pair</th><th>κ (yes/no)</th><th>κ (all categories)</th>
-            <th>n common</th></tr>
-      </thead>
-      <tbody id="pair-rows"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Pair</th><th>κ (yes/no)</th><th>κ (all categories)</th>
+              <th>n common</th></tr>
+        </thead>
+        <tbody id="pair-rows"></tbody>
+      </table>
+    </div>
 
     <h2 class="metrics-h2">Fleiss' κ across active raters</h2>
     <div id="fleiss-box" class="muted">—</div>
 
     <h2 class="metrics-h2">Label distributions</h2>
-    <table class="data-table">
-      <thead>
-        <tr><th>Rater</th><th>n</th><th>yes</th><th>no</th><th>unsure</th></tr>
-      </thead>
-      <tbody id="dist-rows"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Rater</th><th>n</th><th>yes</th><th>no</th><th>unsure</th></tr>
+        </thead>
+        <tbody id="dist-rows"></tbody>
+      </table>
+    </div>
   </div>
 
   <script src="{{ url_for('static', filename='metrics.js') }}"></script>

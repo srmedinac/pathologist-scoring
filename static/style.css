@@ -329,3 +329,96 @@ kbd {
   display: flex; justify-content: space-between;
   padding: 6px 8px; font-size: 12px; color: var(--muted);
 }
+
+/* ============================================================
+   RESPONSIVE — phone / small tablet
+   The pathologist's primary touch surface is review.html, which
+   must stay one-handed-thumb-usable: big tap targets at the
+   bottom, image fills the viewport, no keyboard cruft.
+   ============================================================ */
+
+/* horizontally-scrollable wrapper for data tables on narrow screens */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll .data-table { min-width: 480px; }
+
+@media (max-width: 720px) {
+  /* generic page chrome */
+  body.page  { padding: 12px; }
+  .card      { padding: 16px 14px; border-radius: 10px; }
+  .card.wide { max-width: 100%; }
+  .card h1   { font-size: 18px; }
+
+  /* login card: never wider than the viewport */
+  .login { width: 100%; max-width: 100%; }
+  .rater-option { padding: 14px 12px; font-size: 15px; }     /* bigger tap target */
+
+  /* topbar: tighter spacing, hide non-essential link text */
+  .topbar { padding: 8px 10px; gap: 10px; flex-wrap: wrap; }
+  .topbar-left, .topbar-right { gap: 8px; }
+  .topbar strong { font-size: 14px; }
+  .progress-text { font-size: 12px; }
+  .help-box { padding: 10px 12px; font-size: 13px; }
+
+  /* image stage: edge-to-edge, less padding so the image gets the room */
+  #stage-area { padding: 6px; }
+  .viewport   { border-radius: 6px; }
+
+  /* footer controls: compact, full-width buttons */
+  .controls { padding: 8px 10px 12px; }
+  .control-row { gap: 8px; flex-wrap: wrap; }
+  .caption { font-size: 13px; flex-basis: 100%; }            /* caption wraps above */
+  .view-tools { gap: 10px; }
+  .toggle { font-size: 12px; }
+
+  /* answer buttons: hide keyboard hints, shrink text, keep big tap targets */
+  .answers { gap: 6px; }
+  .ans-btn { font-size: 14px; padding: 14px 4px; font-weight: 600; }
+  .ans-btn .k { display: none; }
+
+  /* zoom controls: bigger to be thumbable */
+  .zoom-btn { width: 38px; height: 38px; font-size: 20px; }
+  #zoom-label { font-size: 13px; width: 34px; }
+
+  /* nav row: stack the keyboard hint out of the way (irrelevant on touch) */
+  .hint { display: none; }
+  kbd   { display: none; }
+  .nav-btn { padding: 10px 14px; font-size: 14px; flex: 1; }
+
+  /* done overlay */
+  .done-overlay .card { width: 94vw; max-width: 380px; }
+
+  /* admin tables: ensure they don't blow up the page */
+  .data-table th, .data-table td { padding: 7px 8px; font-size: 13px; }
+  .select-banner, .cf-reminder { font-size: 13px; }
+
+  /* metrics dashboard: stack the headline cells */
+  .headline-grid { grid-template-columns: repeat(2, 1fr); gap: 10px 16px; }
+  .hl-val  { font-size: 17px; }
+  .hl-big  { font-size: 22px; }
+  .metrics-h2 { font-size: 15px; margin-top: 22px; }
+
+  /* curate / preview grids: tighter min cell width */
+  .curate-grid, .preview-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .curate-stats { font-size: 13px; padding: 8px 12px; }
+  .curate-head { gap: 10px; }
+  .curate-actions { width: 100%; }
+  .curate-actions .curate-btn { flex: 1; }
+
+  /* raters management */
+  #raters-table .email-input { font-size: 13px; padding: 6px 8px; }
+  .add-rater { flex-direction: column; align-items: stretch; }
+  .add-rater > div { width: 100%; min-width: 0; }
+  .add-rater button { width: 100%; }
+
+  /* magnifier popup (hover-only, but in case touch fires it) */
+  .magnifier img { width: 86vw; }
+}
+
+/* Very small screens (older iPhones, foldables closed) — tighter still */
+@media (max-width: 380px) {
+  body.page { padding: 8px; }
+  .card     { padding: 14px 12px; }
+  .ans-btn  { font-size: 13px; padding: 12px 2px; }
+  .topbar strong { display: none; }                          /* save horizontal room */
+}
+

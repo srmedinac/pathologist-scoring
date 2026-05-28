@@ -24,26 +24,28 @@
       Otherwise that email can't reach this app at all.
     </div>
 
-    <table class="data-table" id="raters-table">
-      <thead>
-        <tr><th>Rater</th><th>Email</th><th>Answers</th><th></th></tr>
-      </thead>
-      <tbody>
-      {% for r in rows %}
-        <tr data-name="{{ r.name }}">
-          <td><b>{{ r.name }}</b></td>
-          <td>
-            <input class="email-input" type="email" value="{{ r.email }}"
-                   placeholder="(unbound — picker fallback)">
-          </td>
-          <td>{{ r.answers }}</td>
-          <td>
-            <button class="row-save">Save</button>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="data-table" id="raters-table">
+        <thead>
+          <tr><th>Rater</th><th>Email</th><th>Answers</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr data-name="{{ r.name }}">
+            <td><b>{{ r.name }}</b></td>
+            <td>
+              <input class="email-input" type="email" value="{{ r.email }}"
+                     placeholder="(unbound — picker fallback)">
+            </td>
+            <td>{{ r.answers }}</td>
+            <td>
+              <button class="row-save">Save</button>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
 
     <h2 class="rater-h2">Add new rater</h2>
     <p class="muted">

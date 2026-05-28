@@ -4,9 +4,14 @@
   const $ = (id) => document.getElementById(id);
 
   const S = { items: [], answers: {}, options: [], idx: 0 };
-  let zoom = 3.0;
+  // On phones (≤720 CSS px) we drop the starting zoom so the whole tile
+  // is visible without horizontal swiping; the rater can zoom in for detail.
+  const NARROW = window.innerWidth <= 720;
+  let zoom = NARROW ? 2.0 : 3.0;
   let shownAt = 0;
-  const BASE_W = Math.min(760, Math.max(420, window.innerWidth - 80));
+  // Image width target: fits the viewport on phones (no forced minimum),
+  // grows up to 760 px on desktops where the 420 px floor used to live.
+  const BASE_W = Math.min(760, Math.max(NARROW ? 280 : 420, window.innerWidth - 40));
   const BOX_KEY = "mitosis_show_box";
   if (localStorage.getItem(BOX_KEY) === "0") {
     $("box-toggle").checked = false;
