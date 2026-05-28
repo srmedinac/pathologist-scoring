@@ -16,6 +16,7 @@ import random
 import sys
 import threading
 import time
+import urllib.parse
 from datetime import datetime, timezone
 
 import cv2
@@ -368,14 +369,17 @@ def login():
 
 @app.route("/logout")
 def logout():
-    # Clear *all* Flask session data (not just 'rater') and end the
-    # Cloudflare Access session too. The ?returnTo=/ bounces the user
-    # straight back to the app root so the next OTP cycle runs on a
-    # clean origin URL — CF's standalone "signed out" page can
-    # occasionally leave the One-Time-PIN provider's state machine in
-    # a half-cleared state on the immediate next sign-in attempt.
+    # Clear *all* Flask session data, then end the Cloudflare Access
+    # session too. CF requires returnTo to be a fully-qualified absolute
+    # URL on the app's own domain (a relative '/' is rejected as
+    # invalid), so build it from the host + forwarded scheme cloudflared
+    # passes through. Landing back on the app root lets the next OTP
+    # cycle start from a clean origin request.
     session.clear()
-    return redirect("/cdn-cgi/access/logout?returnTo=/")
+    proto = request.headers.get("X-Forwarded-Proto", "https")
+    return_to = "%s://%s/" % (proto, request.host)
+    return redirect("/cdn-cgi/access/logout?returnTo=%s"
+                    % urllib.parse.quote(return_to, safe=""))
 
 
 @app.route("/review")
