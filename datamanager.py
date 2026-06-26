@@ -37,7 +37,6 @@ import os
 import re
 import shutil
 import threading
-import zipfile
 from datetime import datetime, timezone
 
 from flask import Blueprint, abort, jsonify, render_template, request
@@ -47,8 +46,9 @@ bp = Blueprint("datamanager", __name__,
                static_folder="static_datamanager",
                static_url_path="/static/datamanager")
 
-# ~95 MB — above a typical ~50 MB slide zip, but kept *under* the Cloudflare 100 MB
-# cap (incl. multipart overhead) so the in-app 413 fires before CF rejects the body.
+# Per-SLIDE request cap. A cohort is uploaded one slide per request; each must
+# stay under Cloudflare's 100 MB free-plan body limit. 95 MB leaves headroom for
+# multipart overhead so the in-app 413 fires before CF rejects the body.
 MAX_UPLOAD_BYTES = 95 * 1024 * 1024
 _POSITIONAL = re.compile(r"^p[0-9]{4}$")          # old positional patch_id form
 _SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,128}$")
@@ -266,36 +266,33 @@ def cohort():
 
 
 # --------------------------------------------------------------------------
-# UPLOAD — one slide as a zip, into a NEW folder, zip-slip guarded
+# UPLOAD — a cohort, ONE SLIDE PER REQUEST (each under the Cloudflare 100 MB cap)
+#
+# The browser picks a cohort folder and POSTs one request per slide (multipart:
+# many files + a parallel `relpath` for each). The server writes each file under
+# patches_dir/[dest/]<slide>/<relpath>, refusing to overwrite an existing slide
+# folder (a re-upload would re-map already-answered detections). Slides larger
+# than the cap are skipped client-side; copy those in out-of-band + Rebuild.
 # --------------------------------------------------------------------------
-def _extract_zip_guarded(zf, dest_root):
-    """Extract a ZipFile into dest_root, rejecting any member that would escape
-    it (absolute paths, '..', or symlinks). Returns the count of files written."""
-    dest_root = os.path.realpath(dest_root)
-    n = 0
-    for info in zf.infolist():
-        nm = info.filename
-        if nm.endswith("/"):
-            continue                                   # directory entry
-        if nm.startswith("/") or nm.startswith("\\") or os.path.isabs(nm):
-            raise ValueError("absolute path in zip: %r" % nm)
-        parts = nm.replace("\\", "/").split("/")
-        if any(p == ".." for p in parts):
-            raise ValueError("parent traversal in zip: %r" % nm)
-        if (info.external_attr >> 16) & 0o170000 == 0o120000:   # symlink member
-            raise ValueError("symlink member in zip: %r" % nm)
-        target = os.path.realpath(os.path.join(dest_root, nm))
-        if target != dest_root and not target.startswith(dest_root + os.sep):
-            raise ValueError("zip member escapes destination: %r" % nm)
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with zf.open(info) as src, open(target, "wb") as dst:
-            shutil.copyfileobj(src, dst)
-        n += 1
-    return n
+def _safe_rel_target(root, relpath):
+    """Validated absolute target for a relative path under root — rejects
+    absolute paths, '..' traversal, and anything escaping root (zip-slip style)."""
+    if not relpath or relpath.startswith("/") or relpath.startswith("\\") or os.path.isabs(relpath):
+        raise ValueError("absolute/empty path: %r" % relpath)
+    parts = relpath.replace("\\", "/").split("/")
+    if any(p in ("..", "") for p in parts):
+        raise ValueError("bad path segment: %r" % relpath)
+    rroot = os.path.realpath(root)
+    target = os.path.realpath(os.path.join(rroot, relpath))
+    if target != rroot and not target.startswith(rroot + os.sep):
+        raise ValueError("escapes destination: %r" % relpath)
+    return target
 
 
 @bp.route("/admin/data/upload", methods=["POST"])
 def upload():
+    """Receive ONE slide (multipart: files[] + parallel relpath[]) and write it
+    under patches_dir/[dest/]<slide>/. The client loops this over a cohort."""
     _require_admin()
     mode = _APP.CFG.get("detection_mode", "auto")
     if mode == "paired_csv":
@@ -303,57 +300,58 @@ def upload():
                              "(candidates come from coords_root, not patches_dir). "
                              "Add paired_csv data out-of-band."), 400
 
-    # scope the size limit to THIS route (no global MAX_CONTENT_LENGTH side-effect)
+    # one slide per request; the limit is scoped here (no global MAX_CONTENT_LENGTH)
     if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
-        return jsonify(error="upload too large (limit %d MB)"
+        return jsonify(error="this slide is over the %d MB per-request limit "
+                             "(Cloudflare caps each upload at 100 MB) — copy it to "
+                             "the server directly and Rebuild instead."
                              % (MAX_UPLOAD_BYTES // (1024 * 1024))), 413
 
-    folder = (request.form.get("folder") or "").strip()
-    if "/" in folder or "\\" in folder or not _SAFE_SEGMENT.match(folder):
-        return jsonify(error="folder name must be a single safe segment "
-                             "(letters, digits, space, _ . -)"), 400
-    f = request.files.get("file")
-    if f is None or not f.filename:
-        return jsonify(error="no file uploaded"), 400
-    if not f.filename.lower().endswith(".zip"):
-        return jsonify(error="upload a .zip of one slide (images + labels/)"), 400
+    slide = (request.form.get("slide") or "").strip()
+    dest = (request.form.get("dest") or "").strip()
+    for label, seg in (("slide", slide), ("dest", dest)):
+        if seg and ("/" in seg or "\\" in seg or not _SAFE_SEGMENT.match(seg)):
+            return jsonify(error="%s name must be a single safe segment "
+                                 "(letters, digits, space, _ . -)" % label), 400
+    if not slide:
+        return jsonify(error="missing slide folder name"), 400
+
+    files = request.files.getlist("file")
+    relpaths = request.form.getlist("relpath")
+    if not files:
+        return jsonify(error="no files in slide '%s'" % slide), 400
+    if len(files) != len(relpaths):
+        return jsonify(error="file/relpath count mismatch"), 400
 
     root = _patches_root()
     if not os.path.isdir(root):
         return jsonify(error="patches_dir does not exist on disk: %s" % root), 400
-    dest = os.path.join(root, folder)
-    if os.path.exists(dest):
-        return jsonify(error="folder '%s' already exists — re-uploading into an "
-                             "existing slide is not allowed (it would re-map "
-                             "already-answered detections). Use a new name." % folder), 409
+    slide_rel = os.path.join(dest, slide) if dest else slide
+    slide_root = os.path.join(root, slide_rel)
+    if os.path.exists(slide_root):
+        return jsonify(error="slide folder '%s' already exists — re-uploading is "
+                             "not allowed (it would re-map already-answered "
+                             "detections). Rename or remove it first." % slide_rel), 409
 
-    tmp_zip = dest + ".upload.zip"
+    # validate every target BEFORE writing anything
     try:
-        f.save(tmp_zip)
-        with zipfile.ZipFile(tmp_zip) as zf:
-            if zf.testzip() is not None:
-                return jsonify(error="corrupt zip"), 400
-            os.makedirs(dest, exist_ok=True)
-            n = _extract_zip_guarded(zf, dest)
-    except zipfile.BadZipFile:
-        _rmtree_quiet(dest)
-        return jsonify(error="not a valid zip file"), 400
-    except ValueError as e:                            # zip-slip guard tripped
-        _rmtree_quiet(dest)
-        return jsonify(error="rejected unsafe zip: %s" % e), 400
-    finally:
-        _unlink_quiet(tmp_zip)
+        targets = [_safe_rel_target(slide_root, rp) for rp in relpaths]
+    except ValueError as e:
+        return jsonify(error="rejected unsafe path: %s" % e), 400
 
-    return jsonify(ok=True, folder=folder, n_files=n,
-                   cohort=_APP.cohort_for(folder, _APP.CFG) or "(unmatched)",
+    try:
+        for f, target in zip(files, targets):
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            f.save(target)
+    except Exception as e:                             # partial write -> clean up
+        _rmtree_quiet(slide_root)
+        return jsonify(error="write failed for '%s': %s" % (slide, e)), 500
+
+    # cohort_for keys off the TOP path segment (dest if nested, else the slide)
+    cohort = _APP.cohort_for(dest or slide, _APP.CFG)
+    return jsonify(ok=True, slide=slide, dest=dest, n_files=len(files),
+                   cohort=cohort or "(unmatched)",
                    note="run Rebuild to add these patches to the review set")
-
-
-def _unlink_quiet(path):
-    try:
-        os.unlink(path)
-    except OSError:
-        pass
 
 
 def _rmtree_quiet(path):

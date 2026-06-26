@@ -119,43 +119,71 @@ cohortAdd && cohortAdd.addEventListener("submit", async (e) => {
   }
 });
 
-// ---- UPLOAD --------------------------------------------------------------
+// ---- UPLOAD (a cohort, one slide per request) ----------------------------
 const uploadForm = $("upload-form");
-uploadForm && uploadForm.addEventListener("submit", (e) => {
+const CAP = 95 * 1024 * 1024;                     // per-slide cap (under CF's 100 MB)
+const MARKERS = new Set(["labels", "clean", "images"]);
+
+function relSegs(f) { return (f.webkitRelativePath || f.name).split("/"); }
+
+// Group the picked files into slides. Returns { slideName: [{file, relpath}] }.
+// Two layouts: a cohort folder (root/<slide>/labels/…) or a single slide folder
+// (root/labels/… → the picked folder itself is the slide).
+function groupSlides(files) {
+  const single = files.some(f => { const s = relSegs(f); return s.length >= 2 && MARKERS.has(s[1].toLowerCase()); });
+  const slides = {};
+  for (const f of files) {
+    const s = relSegs(f);
+    let name, rel;
+    if (single) { name = s[0]; rel = s.slice(1).join("/"); }
+    else { if (s.length < 3) continue; name = s[1]; rel = s.slice(2).join("/"); }
+    if (!rel) continue;
+    (slides[name] = slides[name] || []).push({ file: f, relpath: rel });
+  }
+  return slides;
+}
+
+uploadForm && uploadForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const folder = $("upload-folder").value.trim();
-  const file = $("upload-file").files[0];
-  if (!file) { setMsg("Choose a .zip file", false); return; }
+  const files = Array.from($("upload-dir").files || []);
+  const dest = $("upload-dest").value.trim();
+  if (!files.length) { setMsg("Pick a folder of slides", false); return; }
+
+  const slides = groupSlides(files);
+  const names = Object.keys(slides).sort();
+  if (!names.length) {
+    setMsg("No slides found — expected <slide>/labels/*.txt under the picked folder.", false);
+    return;
+  }
+
   const submit = e.submitter || e.target.querySelector("button");
   submit.disabled = true;
+  const log = $("upload-log"); log.style.display = "block"; log.textContent = "";
+  const line = (t) => { log.textContent += t + "\n"; log.scrollTop = log.scrollHeight; };
+  const mb = (b) => (b / 1048576).toFixed(1);
 
-  const fd = new FormData();
-  fd.append("folder", folder);
-  fd.append("file", file);
-
-  const track = $("upload-track"), fill = $("upload-fill");
-  track.style.display = "block"; fill.style.width = "0%";
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", "/admin/data/upload");
-  xhr.upload.onprogress = (ev) => {
-    if (ev.lengthComputable) fill.style.width = (100 * ev.loaded / ev.total).toFixed(0) + "%";
-  };
-  xhr.onload = () => {
-    submit.disabled = false;
-    let data = {};
-    try { data = JSON.parse(xhr.responseText); } catch (_) {}
-    if (xhr.status >= 200 && xhr.status < 300) {
-      setMsg(`Uploaded ${folder} (${data.n_files} files, cohort: ${data.cohort}). `
-             + `Switch to Rebuild to add it.`, true);
-      uploadForm.reset();
-    } else {
-      setMsg(`Upload failed: ${data.error || ("HTTP " + xhr.status)}`, false);
-    }
-    setTimeout(() => { track.style.display = "none"; }, 1500);
-  };
-  xhr.onerror = () => { submit.disabled = false; setMsg("Upload failed (network).", false); };
-  xhr.send(fd);
+  line(`Found ${names.length} slide(s)${dest ? " → under " + dest : ""}.`);
+  let ok = 0, skip = 0, fail = 0;
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i], grp = slides[name];
+    const size = grp.reduce((a, b) => a + b.file.size, 0);
+    const tag = `[${i + 1}/${names.length}] ${name}`;
+    if (size > CAP) { line(`${tag}: SKIP — ${mb(size)} MB > 95 MB; copy to server directly`); skip++; continue; }
+    const fd = new FormData();
+    fd.append("slide", name);
+    if (dest) fd.append("dest", dest);
+    for (const it of grp) { fd.append("file", it.file); fd.append("relpath", it.relpath); }
+    line(`${tag}: uploading ${grp.length} files (${mb(size)} MB)…`);
+    try {
+      const r = await fetch("/admin/data/upload", { method: "POST", body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { ok++; line(`${tag}: ✓ done (cohort: ${d.cohort})`); }
+      else { fail++; line(`${tag}: ✗ ${d.error || ("HTTP " + r.status)}`); }
+    } catch (err) { fail++; line(`${tag}: ✗ ${err.message}`); }
+  }
+  line(`\nDone — ${ok} uploaded, ${skip} skipped, ${fail} failed. Switch to Rebuild to add them.`);
+  setMsg(`Cohort upload: ${ok} uploaded, ${skip} skipped, ${fail} failed`, fail === 0);
+  submit.disabled = false;
 });
 
 // ---- REBUILD -------------------------------------------------------------

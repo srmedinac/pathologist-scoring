@@ -128,9 +128,13 @@ The **data-manager** at `/admin/data` (admin-only) does all of this from the UI:
   `rater_cohorts` and takes effect on the rater's next page load).
 - **Organize** — create / rename / delete / edit cohort definitions (glob
   patterns only — it never moves files on disk, which would re-id patches).
-- **Upload** — upload one slide as a `.zip` (images + a `labels/` subfolder)
-  into a **new** folder under `patches_dir`, zip-slip guarded. Disabled for
-  `paired_csv` mode (its candidates come from `coords_root`, not `patches_dir`).
+- **Upload** — pick a cohort folder (one subfolder per slide, each with images +
+  a `labels/` subfolder); it uploads **one slide per request** over HTTPS so each
+  stays under Cloudflare's 100 MB free-plan body limit. New folders only
+  (re-uploading an existing slide is rejected — it would re-map answered
+  detections); path-traversal guarded. Slides over ~95 MB are skipped (copy those
+  in out-of-band, then Rebuild). Disabled for `paired_csv` mode (its candidates
+  come from `coords_root`, not `patches_dir`).
 - **Rebuild & apply** — rescans `patches_dir`, rebuilds the manifest, and
   hot-swaps it into the running app (no restart). Existing answers keep their
   patches because ids are content-addressed.

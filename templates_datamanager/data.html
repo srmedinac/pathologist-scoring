@@ -26,6 +26,13 @@
     .dm-row-actions button { margin-right: 6px; }
     .dm-section { margin: 18px 0; }
     .dm-hint { font-size: 12px; color: #6a7682; }
+    .dm-struct { background: #f5f7f9; border: 1px solid #e0e6eb; border-radius: 8px;
+                 padding: 12px 14px; margin: 12px 0; font-size: 13px; }
+    .dm-struct pre { margin: 8px 0; padding: 10px 12px; background: #fff;
+                     border: 1px solid #e0e6eb; border-radius: 6px; overflow-x: auto; }
+    .dm-note { font-size: 12.5px; color: #51606e; background: #eef4fb;
+               border: 1px solid #c8d8ed; border-radius: 8px; padding: 10px 12px;
+               margin-top: 14px; line-height: 1.5; }
   </style>
 </head>
 <body class="page">
@@ -154,40 +161,59 @@
 
     <!-- ============================ UPLOAD ============================ -->
     <section class="dm-panel" id="panel-upload">
-      <h2>Upload a slide</h2>
+      <h2>Upload a cohort</h2>
       {% if not upload_enabled %}
         <div class="dm-warn">
           Upload is disabled for <b>{{ detection_mode }}</b> mode — its candidates
           come from <span class="dm-mono">coords_root</span>, not
-          <span class="dm-mono">patches_dir</span>, so an uploaded folder wouldn't
+          <span class="dm-mono">patches_dir</span>, so uploaded folders wouldn't
           be picked up. Add data for this study out-of-band, then Rebuild.
         </div>
       {% else %}
         <p class="muted">
-          Upload <b>one slide as a .zip</b> containing its images (in
-          <span class="dm-mono">clean/</span> or at the root) and its YOLO labels
-          in a <span class="dm-mono">labels/</span> subfolder. It's extracted into
-          a <b>new</b> folder under patches_dir; name the folder so its prefix
-          matches the intended cohort (e.g. <span class="dm-mono">um071</span> for
-          cohort <b>upmc</b>). Then run <b>Rebuild</b> to add it to the review set.
+          Pick a folder of slides (a whole cohort, or any subset). Each slide is
+          uploaded separately, then run <b>Rebuild</b> to add them to the review set.
         </p>
+
+        <div class="dm-struct">
+          <b>Expected folder structure</b> — one subfolder per slide:
+<pre class="dm-mono">my_cohort/                 ← the folder you pick
+  um072/                   ← one slide (folder name = slide id)
+    clean/   *.jpeg        ← tile images (or put images at the slide root)
+    labels/  *.txt         ← one YOLO .txt per image (same basename)
+  um073/
+    clean/   *.jpeg
+    labels/  *.txt
+  …</pre>
+          Name slide folders with the cohort prefix (e.g. <span class="dm-mono">um*</span> → cohort
+          <b>upmc</b>), or add a matching pattern in <b>Organize cohorts</b>. Picking a single
+          slide folder (one that directly contains <span class="dm-mono">labels/</span>) uploads
+          just that slide.
+        </div>
+
         <form id="upload-form" class="add-rater">
           <div>
-            <label class="field-label">Slide folder name</label>
-            <input type="text" id="upload-folder" required
-                   placeholder="e.g. um071 a3">
+            <label class="field-label">Cohort / slides folder</label>
+            <input type="file" id="upload-dir" webkitdirectory directory multiple required>
           </div>
           <div>
-            <label class="field-label">Zip file</label>
-            <input type="file" id="upload-file" accept=".zip" required>
+            <label class="field-label">Put under subfolder (optional)</label>
+            <input type="text" id="upload-dest"
+                   placeholder="(blank = slide folders go directly under patches_dir)">
           </div>
-          <button type="submit">Upload</button>
+          <button type="submit">Upload cohort</button>
         </form>
-        <div class="progress-track small dm-section" id="upload-track" style="display:none">
-          <div class="progress-fill" id="upload-fill"></div>
+
+        <div class="dm-status" id="upload-log" style="display:none"></div>
+
+        <div class="dm-note">
+          <b>How big can this be?</b> Uploads go over HTTPS through Cloudflare,
+          which caps <b>each request at 100 MB</b> on the free plan — so a cohort is
+          sent <b>one slide at a time</b> (a slide is typically ~50 MB). Any single
+          slide over ~95 MB is skipped here; copy those to the server directly
+          (rsync/scp) and just hit Rebuild. Re-uploading an existing slide folder is
+          rejected (it would re-map already-answered detections).
         </div>
-        <p class="dm-hint">Re-uploading into an existing folder is rejected (it
-          would re-map already-answered detections). Max 100 MB.</p>
       {% endif %}
     </section>
 
