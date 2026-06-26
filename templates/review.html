@@ -17,6 +17,12 @@
       <span id="progress-text" class="muted">loading…</span>
     </div>
     <div class="topbar-right">
+      {% if can_curate %}
+        <a class="topbar-link curate-cta" href="{{ url_for('admin_curate') }}">Curate patches →</a>
+      {% endif %}
+      {% if grade_enabled %}
+        <a class="topbar-link" href="{{ url_for('grade') }}">Slide grading →</a>
+      {% endif %}
       <span class="muted">{{ rater }}</span>
       <a href="{{ url_for('logout') }}">sign out</a>
     </div>
@@ -67,10 +73,15 @@
     </div>
   </div>
 
+  {#- answer-button metadata is built from config so one codebase serves every
+      study: labels come from cfg.answer_labels (fallback = capitalised option),
+      cls/key from a known map (fallback = ans-<opt> / first letter). -#}
   <script>window.OPTION_META = {
-    yes:    {label: "Yes — mitosis",     cls: "ans-yes",    key: "y"},
-    no:     {label: "No — not mitosis",  cls: "ans-no",     key: "n"},
-    unsure: {label: "Unsure",            cls: "ans-unsure", key: "u"}
+  {% set labels = cfg.answer_labels or {} %}
+  {% set keymap = {'yes': 'y', 'no': 'n', 'unsure': 'u'} %}
+  {% for opt in cfg.answer_options %}
+    {{ opt | tojson }}: {label: {{ (labels.get(opt) or opt|capitalize) | tojson }}, cls: "ans-{{ opt }}", key: {{ (keymap.get(opt) or opt[0]) | tojson }}}{% if not loop.last %},{% endif %}
+  {% endfor %}
   };</script>
   <script src="{{ url_for('static', filename='review.js') }}"></script>
 </body>

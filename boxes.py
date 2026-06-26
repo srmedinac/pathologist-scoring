@@ -145,14 +145,44 @@ def _to_xywh(vals, w, h):
 
 
 def read_yolo_txt(txt_path, w, h):
+    """Axis-aligned boxes [x, y, w, h] in pixels from a YOLO label file.
+
+    Handles two normalized formats per line, distinguished by column count:
+      * plain detection  : cls cx cy w h [conf]           (4 or 5 values after cls)
+      * oriented/polygon : cls x1 y1 x2 y2 ... [conf]      (>=6 values, an even
+        number of point coords, with an optional trailing conf making it odd)
+    For polygons/oriented boxes we take the axis-aligned bounding box of the
+    points — that is what the review highlight draws."""
     out = []
     with open(txt_path) as fh:
         for line in fh:
             p = line.split()
-            if len(p) >= 5:                          # cls cx cy w h [conf]
-                cx, cy, bw, bh = (float(v) for v in p[1:5])
+            if len(p) < 5:
+                continue
+            vals = [float(v) for v in p[1:]]
+            n = len(vals)
+            if n in (4, 5):                          # cls cx cy w h [conf]
+                cx, cy, bw, bh = vals[:4]
                 out.append([(cx - bw / 2) * w, (cy - bh / 2) * h, bw * w, bh * h])
+            else:                                    # polygon / OBB -> AABB
+                pts = vals[:-1] if n % 2 else vals   # drop trailing conf if odd
+                xs, ys = pts[0::2], pts[1::2]
+                if not xs or not ys:
+                    continue
+                x0, y0 = min(xs) * w, min(ys) * h
+                out.append([x0, y0, (max(xs) - min(xs)) * w, (max(ys) - min(ys)) * h])
     return [[int(v) for v in b] for b in out]
+
+
+def stable_pid(image_rel):
+    """Deterministic patch id from a patch's relative image path.
+
+    Content-addressed (not positional) so rebuilding the manifest after adding
+    new slides/cohorts never renumbers existing patches — prior raters' results
+    and the curation selection stay valid across rebuilds."""
+    import hashlib
+    norm = image_rel.replace(os.sep, "/")
+    return "p" + hashlib.sha1(norm.encode("utf-8")).hexdigest()[:12]
 
 
 def read_json_sidecar(json_path, w, h):
@@ -233,12 +263,35 @@ def build_coord_index(patches_dir, cfg):
     return index
 
 
+def yolo_subdir_path(patches_dir, fullpath, labels_subdir):
+    """For a patch at <patches_dir>/<slide>/.../<stem>.<ext>, return the
+    YOLO label path <patches_dir>/<slide>/<labels_subdir>/<stem>.txt.
+
+    Matches the conventional YOLO layout where each slide folder has a
+    sibling labels/ subdir; works whether patches live directly under the
+    slide folder or one level deeper (e.g. <slide>/images/<patch>.jpeg)."""
+    rel = os.path.relpath(fullpath, patches_dir)
+    parts = rel.split(os.sep)
+    if len(parts) < 2:
+        return None
+    stem = os.path.splitext(parts[-1])[0]
+    return os.path.join(patches_dir, parts[0], labels_subdir, stem + ".txt")
+
+
 def detections_for_image(relpath, fullpath, img, cfg, coord_index):
     """Return a list of [x, y, w, h] boxes for one patch image."""
     h, w = img.shape[:2]
     mode = cfg.get("detection_mode", "auto")
     if mode == "whole_patch":
         return []  # caller substitutes a single None detection
+
+    if mode == "yolo_subdir":
+        pdir = cfg.get("_patches_dir_abs")        # set by build_manifest
+        sub = cfg.get("labels_subdir", "labels")
+        tx = yolo_subdir_path(pdir, fullpath, sub) if pdir else None
+        if tx and os.path.exists(tx):
+            return read_yolo_txt(tx, w, h)
+        return []
 
     if mode in ("auto", "coords"):
         key = os.path.basename(relpath).lower()

@@ -7,6 +7,7 @@
   "coords_csv": "",
   "coords_root": "",
   "tiles_subdir": "tiles",
+  "labels_subdir": "labels",
 
   "n_patches": 500,
   "seed": 1234,
@@ -27,11 +28,22 @@
   },
 
   "answer_options": ["yes", "no", "unsure"],
+  "answer_labels": {"yes": "Yes — true detection", "no": "No — false positive", "unsure": "Unsure"},
   "raters": ["rater_1", "rater_2", "rater_3"],
   "rater_emails": {},
   "shuffle_per_rater": true,
 
+  "cohorts": {},
+  "rater_cohorts": {},
+
   "admin_emails": ["you@example.com"],
+  "curator_emails": [],
+  "sibling_studies": [],
+  "data_manager": true,
+
+  "slides_dir": "",
+  "grade_options": ["high", "low", "unsure"],
+
   "secret_key": "CHANGE-ME-RANDOM-STRING",
   "port": 8000
 }

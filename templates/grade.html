@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ cfg.study_title }} — slide grading</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='grade.css') }}">
+  <script src="{{ url_for('static', filename='openseadragon/openseadragon.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='openseadragon-scalebar.js') }}"></script>
+</head>
+<body class="grade-page">
+  <header class="topbar">
+    <div class="topbar-left">
+      <strong>{{ cfg.study_title }} — slide grading</strong>
+      <span id="slide-meta" class="muted"></span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+      <span id="progress-text" class="muted">loading…</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="{{ url_for('review') }}">‹ Patch review</a>
+      <span class="muted">{{ rater }}</span>
+      <a href="{{ url_for('logout') }}">sign out</a>
+    </div>
+  </header>
+
+  <main id="grade-stage">
+    <div id="osd"></div>
+    <div id="slide-name" class="slide-name-pill"></div>
+    <div id="grade-loading" class="grade-loading" hidden>
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <footer class="controls">
+    <div class="control-row answers" id="answers"><!-- answer buttons --></div>
+
+    <div class="control-row nav">
+      <button id="back-btn" class="nav-btn">‹ Previous slide</button>
+      <span class="hint">keys: <kbd>H</kbd> high · <kbd>L</kbd> low · <kbd>U</kbd> unsure ·
+        <kbd>←</kbd>/<kbd>→</kbd> move · scroll/drag to navigate</span>
+      <button id="next-btn" class="nav-btn">Next slide ›</button>
+    </div>
+  </footer>
+
+  <div id="done-overlay" class="done-overlay hidden">
+    <div class="card">
+      <h1>All slides graded — thank you!</h1>
+      <p id="done-text" class="muted"></p>
+      <button id="review-again" class="btn-secondary">Look back over my grades</button>
+    </div>
+  </div>
+
+  <div id="empty-overlay" class="done-overlay hidden">
+    <div class="card">
+      <h1>No slides loaded yet</h1>
+      <p class="muted">An admin needs to upload the slide list. You'll see slides here once that's done.</p>
+      <a href="{{ url_for('review') }}" class="btn-primary"
+         style="display:inline-block; text-decoration:none; margin-top:14px">
+        Back to patch review →
+      </a>
+    </div>
+  </div>
+
+  <script>window.GRADE_META = {
+    high:   {label: "Mitosis HIGH", cls: "ans-yes",    key: "h"},
+    low:    {label: "Mitosis LOW",  cls: "ans-no",     key: "l"},
+    unsure: {label: "Unsure",       cls: "ans-unsure", key: "u"}
+  };</script>
+  <script src="{{ url_for('static', filename='grade.js') }}"></script>
+</body>
+</html>

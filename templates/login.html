@@ -54,6 +54,11 @@
 
     <button type="submit" class="btn-primary">Start reviewing</button>
 
+    {% if grade_enabled %}
+      <p style="margin-top:14px; text-align:center">
+        <a href="{{ url_for('grade') }}">Or grade slides (mitosis high / low) →</a>
+      </p>
+    {% endif %}
     {% if is_admin %}
       <p style="margin-top:14px; text-align:center">
         <a href="{{ url_for('admin') }}">Admin dashboard →</a>

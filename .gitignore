@@ -3,7 +3,11 @@ config.json
 
 # Generated study data (specific to one deployment)
 manifest.json
+manifest.json.bak-*
+slides_manifest.json
+slides.csv
 results/
+grading_results/
 URL.txt
 logo_url.txt
 
@@ -17,6 +21,7 @@ scoring.py
 
 # Generated caches
 thumb_cache/
+thumb_cache_slides/
 web_cache/
 __pycache__/
 *.pyc

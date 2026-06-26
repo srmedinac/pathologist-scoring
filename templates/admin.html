@@ -7,13 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="page">
-  {% if auth_email %}
-  <div class="page-auth">
-    Signed in as <b>{{ auth_email }}</b>
-    &middot;
-    <a href="{{ url_for('logout') }}">sign out</a>
-  </div>
-  {% endif %}
+  {% include '_authstrip.html' %}
   <div class="card wide">
     <h1>Study progress</h1>
     <p class="muted">
@@ -28,13 +22,21 @@
       <a href="{{ url_for('admin_curate') }}">curate the selection →</a>
     </div>
 
+    {% if cohort_dets and (cohort_dets|length > 1 or '(unassigned)' not in cohort_dets) %}
+    <div class="select-banner">
+      <strong>Cohorts:</strong>
+      {% for c, n in cohort_dets.items() %}{{ c }} <b>{{ n }}</b>{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+
     <div class="table-scroll">
       <table class="data-table">
-        <thead><tr><th>Rater</th><th>Reviewed</th><th>Progress</th><th>CSV</th></tr></thead>
+        <thead><tr><th>Rater</th><th>Cohort(s)</th><th>Reviewed</th><th>Progress</th><th>CSV</th></tr></thead>
         <tbody>
         {% for r in rows %}
           <tr>
             <td>{{ r.rater }}</td>
+            <td>{{ r.cohorts }}</td>
             <td>{{ r.done }} / {{ r.total }}</td>
             <td>
               <div class="progress-track small"><div class="progress-fill"
@@ -54,6 +56,10 @@
       <a href="{{ url_for('admin_raters') }}">Manage raters &amp; emails</a>
       &nbsp;·&nbsp;
       <a href="{{ url_for('preview') }}">Check detection boxes (preview)</a>
+      &nbsp;·&nbsp;
+      <a href="{{ url_for('admin_grade') }}">Slide grading progress</a>
+      {% if data_enabled %}&nbsp;·&nbsp;
+      <a href="{{ url_for('datamanager.data') }}"><b>⚙ Manage data</b> (upload / organize / assign)</a>{% endif %}
     </p>
   </div>
 </body>

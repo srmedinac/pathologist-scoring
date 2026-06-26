@@ -7,13 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="page">
-  {% if auth_email %}
-  <div class="page-auth">
-    Signed in as <b>{{ auth_email }}</b>
-    &middot;
-    <a href="{{ url_for('logout') }}">sign out</a>
-  </div>
-  {% endif %}
+  {% include '_authstrip.html' %}
   <div class="card wide">
     <div class="curate-head">
       <div>
@@ -24,7 +18,8 @@
         </p>
       </div>
       <div class="curate-actions">
-        <a class="link-btn" href="{{ url_for('admin') }}">← admin</a>
+        {% if is_admin %}<a class="link-btn" href="{{ url_for('admin') }}">← admin</a>
+        {% else %}<a class="link-btn" href="{{ url_for('review') }}">← back to review</a>{% endif %}
         <button class="btn-secondary curate-btn" id="bulk-keep">Keep all</button>
         <button class="btn-secondary curate-btn" id="bulk-skip">Skip all</button>
       </div>

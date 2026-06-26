@@ -1,0 +1,23 @@
+{# Admin-page top strip: sibling-study switch on the left, sign-out on the right. #}
+{% if auth_email or sibling_studies %}
+<div class="page-auth">
+  {% if is_admin and sibling_studies %}
+    <span class="study-switch">
+      <span class="muted">Study:</span>
+      <b>{{ cfg.study_title }}</b>
+      &middot;
+      switch to
+      {% for s in sibling_studies %}
+        <a href="{{ s.url }}">{{ s.name }}</a>{% if not loop.last %} ·{% endif %}
+      {% endfor %}
+    </span>
+  {% endif %}
+  {% if auth_email %}
+    <span class="auth-side">
+      Signed in as <b>{{ auth_email }}</b>
+      &middot;
+      <a href="{{ url_for('logout') }}">sign out</a>
+    </span>
+  {% endif %}
+</div>
+{% endif %}

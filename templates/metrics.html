@@ -7,13 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="page">
-  {% if auth_email %}
-  <div class="page-auth">
-    Signed in as <b>{{ auth_email }}</b>
-    &middot;
-    <a href="{{ url_for('logout') }}">sign out</a>
-  </div>
-  {% endif %}
+  {% include '_authstrip.html' %}
   <div class="card wide">
     <h1>Live metrics</h1>
     <p class="muted">

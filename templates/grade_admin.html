@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slide grading — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  {% include '_authstrip.html' %}
+  <div class="card wide">
+    <h1>Slide grading progress</h1>
+    <p class="muted">
+      {{ n_total }} slides in manifest · {{ n_slides }} kept · {{ n_skipped }} skipped (curation)
+      · {{ n_predicted }} with a model prediction · options:
+      {% for o in options %}<code>{{ o }}</code>{% if not loop.last %} · {% endif %}{% endfor %}
+    </p>
+
+    {% if n_total > 0 %}
+    <div class="select-banner">
+      <strong>Selection:</strong> {{ n_slides }} kept · {{ n_skipped }} skipped &nbsp;·&nbsp;
+      pathologists see <b>{{ n_slides }}</b> slide{% if n_slides != 1 %}s{% endif %}
+      &nbsp;·&nbsp;
+      <a href="{{ url_for('admin_grade_curate') }}">curate the selection →</a>
+    </div>
+    {% endif %}
+
+    {% if n_slides == 0 %}
+      <p class="muted">
+        No slides loaded yet. Drop a <code>slides.csv</code> next to <code>app.py</code> with
+        columns <code>slide_id,path,predicted_label</code> and run
+        <code>python app.py build_slides slides.csv</code>, then restart the service.
+      </p>
+    {% else %}
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th>Rater</th><th>Graded</th><th>Progress</th>
+            <th>Agreement vs predicted</th><th>CSV</th>
+          </tr></thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.rater }}</td>
+              <td>{{ r.done }} / {{ r.total }}</td>
+              <td>
+                <div class="progress-track small"><div class="progress-fill"
+                     style="width: {{ r.pct }}%"></div></div>
+                <span class="muted">{{ r.pct }}%</span>
+              </td>
+              <td>
+                {% if r.agree_pct is none %}
+                  <span class="muted">—</span>
+                {% else %}
+                  {{ r.agree_n }} / {{ r.agree_total }}
+                  <span class="muted">({{ r.agree_pct }}%)</span>
+                {% endif %}
+              </td>
+              <td><a href="{{ url_for('admin_grade_csv', rater=r.rater) }}">download</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style="margin-top: 28px;">Confusion vs predicted</h2>
+      <p class="muted">Rows = predicted label · Columns = rater grade. Empty rows / columns hidden.</p>
+      {% for r in rows if r.agree_total > 0 %}
+        <h3 style="margin-bottom:4px;">{{ r.rater }}</h3>
+        <div class="table-scroll" style="margin-bottom:14px;">
+          <table class="data-table" style="min-width: 320px; max-width: 480px;">
+            <thead><tr>
+              <th></th>
+              {% for o in options %}<th>{{ o }}</th>{% endfor %}
+            </tr></thead>
+            <tbody>
+              {% for p in options %}
+              <tr>
+                <th>predicted {{ p }}</th>
+                {% for l in options %}
+                  <td {% if p == l %}style="background:#eef6ee; font-weight:600;"{% endif %}>
+                    {{ r.confusion[(p, l)] }}
+                  </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <p style="margin-top: 22px;">
+      <a href="{{ url_for('admin') }}">← Back to patch-review dashboard</a>
+    </p>
+  </div>
+</body>
+</html>

@@ -78,6 +78,17 @@ input[type=password] {
 }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
 .topbar-right { margin-left: auto; }
+.topbar-link {
+  font-size: 13px; text-decoration: none; color: var(--accent);
+  padding: 3px 8px; border-radius: 6px; background: rgba(67,107,156,.08);
+}
+.topbar-link:hover { background: rgba(67,107,156,.14); }
+.topbar-link.curate-cta {
+  background: var(--accent); color: #fff;
+  padding: 6px 12px; font-weight: 600; font-size: 13px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+}
+.topbar-link.curate-cta:hover { filter: brightness(1.08); }
 .link-btn {
   background: none; border: none; color: var(--accent);
   cursor: pointer; font-size: 13px; text-decoration: underline;
@@ -244,13 +255,69 @@ kbd {
 .curate-cell.skipped img { filter: grayscale(.85) brightness(.62); }
 .curate-cell.skipped .cell-mark { display: block; }
 
+/* ---- slide-curation page (grouped by case) ---- */
+.slide-curate-groups { display: flex; flex-direction: column; gap: 18px; }
+.slide-case {
+  border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; background: var(--panel);
+}
+.slide-case-head {
+  display: flex; align-items: baseline; gap: 12px;
+  margin: 0 0 10px; flex-wrap: wrap;
+}
+.slide-case-head h3 { margin: 0; font-size: 16px; }
+.pred-pill {
+  font-size: 12px; font-weight: 600; padding: 2px 8px;
+  border-radius: 12px; letter-spacing: .02em;
+}
+.pred-high { background: #fde2e2; color: #882020; }
+.pred-low  { background: #e1efff; color: #1d4886; }
+.pred-none { background: #ececec; color: #555; }
+
+.slide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.slide-cell {
+  position: relative; margin: 0; cursor: pointer;
+  border: 2px solid #d8d8d8; border-radius: 8px; overflow: hidden;
+  background: #f6f6f6; transition: border-color .12s;
+}
+.slide-cell:hover { border-color: #888; }
+.slide-cell img {
+  display: block; width: 100%; aspect-ratio: 1/1;
+  object-fit: cover; background: #ddd;
+}
+.slide-cell figcaption {
+  padding: 5px 8px; font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted); border-top: 1px solid var(--line);
+  background: #fff;
+}
+.slide-cell .cell-mark {
+  display: none; position: absolute; top: 8px; right: 8px;
+  background: rgba(120, 30, 30, .82); color: #fff;
+  font-size: 10.5px; font-weight: 700;
+  padding: 3px 6px; border-radius: 4px;
+  letter-spacing: .04em;
+}
+.slide-cell.skipped { border-color: #e6c7c7; }
+.slide-cell.skipped img { filter: grayscale(.85) brightness(.62); }
+.slide-cell.skipped .cell-mark { display: block; }
+
 /* ---- admin-page auth strip (sign-out pill above each card) ---- */
 .page-auth {
   max-width: 1100px; margin: 0 auto 14px;
   text-align: right; font-size: 13px; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; flex-wrap: wrap;
 }
 .page-auth b { color: var(--ink); }
 .page-auth a { margin-left: 6px; }
+.page-auth .study-switch { margin-left: 0; }
+.page-auth .study-switch a { margin: 0 4px 0 6px; }
+.page-auth .auth-side { margin-left: auto; }
 
 /* ---- manage raters ---- */
 .cf-reminder {

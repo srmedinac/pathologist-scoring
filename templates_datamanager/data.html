@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage data — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .dm-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 18px; }
+    .dm-tab { padding: 8px 14px; border: 1px solid #d6dce2; border-radius: 8px;
+              background: #f5f7f9; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .dm-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .dm-panel { display: none; }
+    .dm-panel.active { display: block; }
+    .dm-cohorts-checks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .dm-cohorts-checks label { font-size: 13px; white-space: nowrap; }
+    .dm-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+    .dm-folderlist { font-size: 12px; color: #51606e; word-break: break-word; }
+    .dm-warn { background: #fff4e5; border: 1px solid #f0c98a; color: #7a4a00;
+               border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .dm-danger { background: #fdecea; border: 1px solid #f0b3ad; color: #8a1c12;
+                 border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .dm-status { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+                 background: #f5f7f9; border: 1px solid #e0e6eb; border-radius: 8px;
+                 padding: 10px 12px; margin-top: 10px; white-space: pre-wrap; }
+    .dm-row-actions button { margin-right: 6px; }
+    .dm-section { margin: 18px 0; }
+    .dm-hint { font-size: 12px; color: #6a7682; }
+  </style>
+</head>
+<body class="page">
+  {% include '_authstrip.html' %}
+  <div class="card wide">
+    <h1>Manage data</h1>
+    <p class="muted">
+      Upload slides, organize them into cohorts, and assign cohorts to raters —
+      no SSH or config editing.
+      &nbsp;<a href="{{ url_for('admin') }}">← admin</a>
+    </p>
+    <p class="dm-hint">
+      patches dir: <span class="dm-mono">{{ patches_dir }}</span> ·
+      mode: <b>{{ detection_mode }}</b>
+    </p>
+
+    <div class="dm-tabs">
+      <div class="dm-tab active" data-panel="assign">Assign raters</div>
+      <div class="dm-tab" data-panel="organize">Organize cohorts</div>
+      <div class="dm-tab" data-panel="upload">Upload slide</div>
+      <div class="dm-tab" data-panel="rebuild">Rebuild &amp; apply</div>
+    </div>
+
+    <!-- ============================ ASSIGN ============================ -->
+    <section class="dm-panel active" id="panel-assign">
+      <h2>Assign raters to cohorts</h2>
+      <p class="muted">
+        Tick the cohorts a rater should see. Tick <b>none</b> → that rater sees
+        <b>all</b> cohorts. Takes effect immediately (no rebuild, no restart) on
+        the rater's next page load.
+      </p>
+      {% if not cohorts %}
+        <div class="dm-warn">No cohorts defined yet. With no cohorts, every rater
+          sees all patches. Define cohorts in <b>Organize cohorts</b> first.</div>
+      {% endif %}
+      <div class="table-scroll">
+        <table class="data-table" id="assign-table">
+          <thead><tr><th>Rater</th><th>Reviewed</th><th>Sees cohorts</th><th></th></tr></thead>
+          <tbody>
+          {% for r in raters %}
+            <tr data-rater="{{ r }}">
+              <td><b>{{ r }}</b></td>
+              <td>{{ progress.get(r, 0) }}</td>
+              <td>
+                {% if cohorts %}
+                  <div class="dm-cohorts-checks">
+                    {% set assigned = rater_cohorts.get(r) %}
+                    {% for c in cohorts %}
+                      <label><input type="checkbox" class="dm-cohort-cb" value="{{ c }}"
+                        {% if assigned and c in assigned %}checked{% endif %}> {{ c }}</label>
+                    {% endfor %}
+                  </div>
+                  {% if not rater_cohorts.get(r) %}<span class="dm-hint">(currently: all)</span>{% endif %}
+                {% else %}
+                  <span class="dm-hint">all</span>
+                {% endif %}
+              </td>
+              <td><button class="assign-save" {% if not cohorts %}disabled{% endif %}>Save</button></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="dm-hint">New raters are added on the
+        <a href="{{ url_for('admin_raters') }}">Raters</a> page (their email must
+        also be on the Cloudflare Access allow-list).</p>
+    </section>
+
+    <!-- ============================ ORGANIZE ============================ -->
+    <section class="dm-panel" id="panel-organize">
+      <h2>Cohorts</h2>
+      <p class="muted">
+        A cohort is a named set of glob patterns matched against each slide
+        folder's name (e.g. <span class="dm-mono">um*</span> → cohort
+        <b>upmc</b>). Editing patterns never moves files — it only changes how
+        slides are grouped, applied on the next <b>Rebuild</b>.
+      </p>
+      <div class="table-scroll">
+        <table class="data-table" id="cohorts-table">
+          <thead><tr><th>Cohort</th><th>Patterns (comma-sep)</th><th>Patches</th>
+            <th>Matched folders</th><th></th></tr></thead>
+          <tbody>
+          {% for name, patterns in cohorts.items() %}
+            <tr data-cohort="{{ name }}">
+              <td><b>{{ name }}</b></td>
+              <td><input class="dm-patterns dm-mono" value="{{ patterns | join(', ') }}"></td>
+              <td>{{ cohort_counts.get(name, 0) }}</td>
+              <td class="dm-folderlist">{{ match.by_cohort.get(name, []) | join(', ') or '—' }}</td>
+              <td class="dm-row-actions">
+                <button class="cohort-edit">Save</button>
+                <button class="cohort-rename btn-secondary">Rename</button>
+                <button class="cohort-delete btn-secondary">Delete</button>
+              </td>
+            </tr>
+          {% endfor %}
+          {% if not cohorts %}
+            <tr><td colspan="5" class="dm-hint">No cohorts defined.</td></tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if match.unmatched %}
+      <div class="dm-section">
+        <strong>Unmatched folders</strong>
+        <span class="dm-hint">(on disk but in no cohort — they fall into "(unassigned)")</span>
+        <div class="dm-folderlist">{{ match.unmatched | join(', ') }}</div>
+      </div>
+      {% endif %}
+
+      <h3>Add a cohort</h3>
+      <form id="cohort-add" class="add-rater">
+        <div>
+          <label class="field-label">Name</label>
+          <input type="text" id="new-cohort-name" pattern="[A-Za-z0-9_\-]+" required
+                 placeholder="e.g. upmc">
+        </div>
+        <div>
+          <label class="field-label">Patterns (comma-sep globs)</label>
+          <input type="text" id="new-cohort-patterns" class="dm-mono" required
+                 placeholder="um*, upmc*">
+        </div>
+        <button type="submit">Add cohort</button>
+      </form>
+    </section>
+
+    <!-- ============================ UPLOAD ============================ -->
+    <section class="dm-panel" id="panel-upload">
+      <h2>Upload a slide</h2>
+      {% if not upload_enabled %}
+        <div class="dm-warn">
+          Upload is disabled for <b>{{ detection_mode }}</b> mode — its candidates
+          come from <span class="dm-mono">coords_root</span>, not
+          <span class="dm-mono">patches_dir</span>, so an uploaded folder wouldn't
+          be picked up. Add data for this study out-of-band, then Rebuild.
+        </div>
+      {% else %}
+        <p class="muted">
+          Upload <b>one slide as a .zip</b> containing its images (in
+          <span class="dm-mono">clean/</span> or at the root) and its YOLO labels
+          in a <span class="dm-mono">labels/</span> subfolder. It's extracted into
+          a <b>new</b> folder under patches_dir; name the folder so its prefix
+          matches the intended cohort (e.g. <span class="dm-mono">um071</span> for
+          cohort <b>upmc</b>). Then run <b>Rebuild</b> to add it to the review set.
+        </p>
+        <form id="upload-form" class="add-rater">
+          <div>
+            <label class="field-label">Slide folder name</label>
+            <input type="text" id="upload-folder" required
+                   placeholder="e.g. um071 a3">
+          </div>
+          <div>
+            <label class="field-label">Zip file</label>
+            <input type="file" id="upload-file" accept=".zip" required>
+          </div>
+          <button type="submit">Upload</button>
+        </form>
+        <div class="progress-track small dm-section" id="upload-track" style="display:none">
+          <div class="progress-fill" id="upload-fill"></div>
+        </div>
+        <p class="dm-hint">Re-uploading into an existing folder is rejected (it
+          would re-map already-answered detections). Max 100 MB.</p>
+      {% endif %}
+    </section>
+
+    <!-- ============================ REBUILD ============================ -->
+    <section class="dm-panel" id="panel-rebuild">
+      <h2>Rebuild &amp; apply</h2>
+      <p class="muted">
+        Rescans patches_dir, rebuilds the manifest, and hot-swaps it into the
+        live app — no restart. Existing answers keep their patches (ids are
+        content-addressed). Run this after uploading slides or editing cohorts.
+      </p>
+      {% if unmigrated %}
+        <div class="dm-danger">
+          <strong>Rebuild is locked.</strong> This deployment still has
+          positional-id results that haven't been migrated to stable ids.
+          Rebuilding now would orphan every prior answer. Run the stable-id
+          migration first (see <span class="dm-mono">migrate_stable_ids.py</span>).
+        </div>
+      {% endif %}
+      <button id="rebuild-btn" class="btn-primary" {% if unmigrated %}disabled{% endif %}>
+        Rebuild &amp; apply now
+      </button>
+      <div class="dm-status" id="rebuild-status">{{ rebuild.state }}{% if rebuild.message %} — {{ rebuild.message }}{% endif %}</div>
+    </section>
+
+    <p id="msg" class="rater-msg"></p>
+  </div>
+
+  <script>
+    window.DM = {{ {'upload_enabled': upload_enabled, 'unmigrated': unmigrated} | tojson }};
+  </script>
+  <script src="{{ url_for('datamanager.static', filename='data.js') }}"></script>
+</body>
+</html>

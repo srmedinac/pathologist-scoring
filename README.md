@@ -16,6 +16,9 @@ CSVs feed straight into inter-rater κ and model-precision analysis.
 - **Admin curation page** — browse the candidate pool as thumbnails with
   a hover-magnifier, click to exclude bad tiles; reviewers see only the
   kept set.
+- **Superadmin data-manager** (`/admin/data`) — upload slides, organize
+  them into cohorts, and assign cohorts to raters entirely from the web
+  UI; see *Cohorts & the data-manager* below.
 - Four ways to source detection boxes (see *Detection modes* below):
   - `paired_csv` — one CSV per image in a parallel folder tree
     (e.g. ultralytics inference output)
@@ -106,6 +109,50 @@ or with a header-only CSV are skipped during sampling.
 - The counter turns green when you're in the 150–250 range — a hint when
   you're at typical study size.
 
+## Cohorts & the data-manager
+
+Patches carry a **content-addressed `patch_id`** (`boxes.stable_pid` = a hash of
+the relative image path), so rebuilding the manifest after adding slides never
+renumbers existing patches — prior raters' results and the curation selection
+stay valid across rebuilds.
+
+Each patch is tagged with a **cohort** by matching its top path segment (the
+slide folder) against `cohorts` in config (`{name: [fnmatch globs]}`, e.g.
+`"upmc": ["um*"]`). `rater_cohorts` (`{rater: [cohorts]}`) restricts a rater to
+their cohorts; a rater with **no entry sees all** (so a study with no cohorts
+behaves exactly as before).
+
+The **data-manager** at `/admin/data` (admin-only) does all of this from the UI:
+
+- **Assign** — tick which cohorts each rater sees. Restart-free (it edits
+  `rater_cohorts` and takes effect on the rater's next page load).
+- **Organize** — create / rename / delete / edit cohort definitions (glob
+  patterns only — it never moves files on disk, which would re-id patches).
+- **Upload** — upload one slide as a `.zip` (images + a `labels/` subfolder)
+  into a **new** folder under `patches_dir`, zip-slip guarded. Disabled for
+  `paired_csv` mode (its candidates come from `coords_root`, not `patches_dir`).
+- **Rebuild & apply** — rescans `patches_dir`, rebuilds the manifest, and
+  hot-swaps it into the running app (no restart). Existing answers keep their
+  patches because ids are content-addressed.
+
+### Migrating an older study to stable ids
+
+A study built before stable ids used **positional** ids (`p0001`). The
+data-manager's Rebuild is **hard-gated (409)** until you migrate, because a
+stable-id rebuild over positional results would orphan every answer. Migrate
+**offline** (don't use the in-process Rebuild for this):
+
+```bash
+python migrate_stable_ids.py --dry-run     # report; writes nothing
+systemctl --user stop <app>                 # quiesce writers
+python migrate_stable_ids.py                # backs up, rewrites ids, writes a sentinel
+python app.py build                         # rebuild manifest -> stable ids + cohort keys
+systemctl --user start <app>
+```
+
+The script backs up `results/` + `selection.json` + `manifest.json` first,
+refuses to run twice (sentinel + id-format guard), and is resumable.
+
 ## Results and analysis
 
 Each reviewer writes one row per detection to
@@ -172,15 +219,19 @@ examples.
 ## Project layout
 
 ```
-app.py              # Flask app, manifest builder, all routes
-boxes.py            # detection sources: paired_csv, YOLO .txt, green-detect
-analyze.py          # κ + precision summary from results CSVs
-make_test_data.py   # synthetic patches for sanity-testing the pipeline
-templates/          # login, review, admin, curate, preview pages
-static/             # style.css, review.js, curate.js
-config.example.json # copy → config.json (gitignored), then edit
-Dockerfile          # for hosted deployments (HF Spaces, Render, …)
-DEPLOY.md           # deployment notes + caveats
+app.py                  # Flask app, manifest builder, all routes
+boxes.py                # detection sources + stable_pid + YOLO/polygon parser
+datamanager.py          # superadmin data-manager blueprint (upload/organize/assign/rebuild)
+migrate_stable_ids.py   # one-time positional→stable id migration (backup + guard + dry-run)
+analyze.py              # κ + precision summary from results CSVs
+make_test_data.py       # synthetic patches for sanity-testing the pipeline
+templates/              # login, review, admin, curate, preview, grade pages
+templates_datamanager/  # data-manager page (blueprint template folder)
+static/                 # style.css, review.js, curate.js, grade assets
+static_datamanager/     # data-manager JS (blueprint static folder)
+config.example.json     # copy → config.json (gitignored), then edit
+Dockerfile              # for hosted deployments (HF Spaces, Render, …)
+DEPLOY.md               # deployment notes + caveats
 ```
 
 ## License

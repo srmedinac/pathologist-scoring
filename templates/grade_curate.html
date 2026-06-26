@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slide curation — {{ cfg.study_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page">
+  {% include '_authstrip.html' %}
+  <div class="card wide">
+    <div class="curate-head">
+      <div>
+        <h1>Slide curation</h1>
+        <p class="muted">
+          Each case (StudyID) groups its slides. Click any thumbnail to <b>skip</b> it
+          (or click again to keep it). Auto-saves on every click. Pathologists only
+          see the kept slides.
+        </p>
+      </div>
+      <div class="curate-actions">
+        <a class="link-btn" href="{{ url_for('admin_grade') }}">← grading admin</a>
+        <button class="btn-secondary curate-btn" id="bulk-keep">Keep all</button>
+        <button class="btn-secondary curate-btn" id="bulk-one">Keep 1 per case</button>
+        <button class="btn-secondary curate-btn" id="bulk-skip">Skip all</button>
+      </div>
+    </div>
+
+    <div class="curate-stats" id="stats">loading…</div>
+
+    <div class="slide-curate-groups">
+      {% for study_id, slides in groups %}
+      <section class="slide-case">
+        <header class="slide-case-head">
+          <h3>{{ study_id }}</h3>
+          {% set pred = slides[0].predicted_label %}
+          <span class="pred-pill pred-{{ pred or 'none' }}">
+            predicted: {{ pred or '—' }}
+          </span>
+          <span class="muted">{{ slides|length }} slide{% if slides|length != 1 %}s{% endif %}</span>
+        </header>
+        <div class="slide-grid">
+          {% for s in slides %}
+          <figure class="slide-cell" data-sid="{{ s.slide_id }}">
+            <img loading="lazy" draggable="false"
+                 src="{{ url_for('grade_thumb', slide_id=s.slide_id) }}?size=320"
+                 alt="{{ s.slide_id }}">
+            <figcaption>
+              <span class="cell-id">{{ s.slide_id }}</span>
+            </figcaption>
+            <div class="cell-mark">SKIPPED</div>
+          </figure>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='grade_curate.js') }}"></script>
+</body>
+</html>
