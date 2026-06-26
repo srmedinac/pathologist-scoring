@@ -8,6 +8,7 @@
 </head>
 <body class="page">
   {% include '_authstrip.html' %}
+  {% include '_adminnav.html' %}
   <div class="card wide">
     <div class="curate-head">
       <div>
@@ -18,8 +19,7 @@
         </p>
       </div>
       <div class="curate-actions">
-        {% if is_admin %}<a class="link-btn" href="{{ url_for('admin') }}">← admin</a>
-        {% else %}<a class="link-btn" href="{{ url_for('review') }}">← back to review</a>{% endif %}
+        {% if not is_admin %}<a class="link-btn" href="{{ url_for('review') }}">← back to review</a>{% endif %}
         <button class="btn-secondary curate-btn" id="bulk-keep">Keep all</button>
         <button class="btn-secondary curate-btn" id="bulk-skip">Skip all</button>
       </div>

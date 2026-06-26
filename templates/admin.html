@@ -8,6 +8,7 @@
 </head>
 <body class="page">
   {% include '_authstrip.html' %}
+  {% include '_adminnav.html' %}
   <div class="card wide">
     <h1>Study progress</h1>
     <p class="muted">
@@ -50,17 +51,6 @@
       </table>
     </div>
 
-    <p>
-      <a href="{{ url_for('admin_metrics') }}">→ Live metrics dashboard (F1, κ)</a>
-      &nbsp;·&nbsp;
-      <a href="{{ url_for('admin_raters') }}">Manage raters &amp; emails</a>
-      &nbsp;·&nbsp;
-      <a href="{{ url_for('preview') }}">Check detection boxes (preview)</a>
-      &nbsp;·&nbsp;
-      <a href="{{ url_for('admin_grade') }}">Slide grading progress</a>
-      {% if data_enabled %}&nbsp;·&nbsp;
-      <a href="{{ url_for('datamanager.data') }}"><b>⚙ Manage data</b> (upload / organize / assign)</a>{% endif %}
-    </p>
   </div>
 </body>
 </html>

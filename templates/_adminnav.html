@@ -1,0 +1,27 @@
+{# Shared admin navigation — a button row shown on every admin page so the
+   superadmin tools are always one click away (no more hunting through the
+   dashboard). Admin-only: curators (non-admin) don't see it. The current page
+   is highlighted via request.endpoint; the Slide-grading and Manage-data
+   buttons are feature-gated by grade_enabled / data_enabled. #}
+{% if is_admin %}
+<nav class="admin-nav">
+  <a class="admin-nav-btn{% if request.endpoint == 'admin' %} active{% endif %}"
+     href="{{ url_for('admin') }}">Dashboard</a>
+  <a class="admin-nav-btn{% if request.endpoint == 'admin_metrics' %} active{% endif %}"
+     href="{{ url_for('admin_metrics') }}">Metrics</a>
+  <a class="admin-nav-btn{% if request.endpoint == 'admin_raters' %} active{% endif %}"
+     href="{{ url_for('admin_raters') }}">Raters</a>
+  <a class="admin-nav-btn{% if request.endpoint == 'admin_curate' %} active{% endif %}"
+     href="{{ url_for('admin_curate') }}">Curate</a>
+  <a class="admin-nav-btn{% if request.endpoint == 'preview' %} active{% endif %}"
+     href="{{ url_for('preview') }}">Preview boxes</a>
+  {% if grade_enabled %}
+  <a class="admin-nav-btn{% if request.endpoint in ['admin_grade', 'admin_grade_curate'] %} active{% endif %}"
+     href="{{ url_for('admin_grade') }}">Slide grading</a>
+  {% endif %}
+  {% if data_enabled %}
+  <a class="admin-nav-btn primary{% if request.endpoint == 'datamanager.data' %} active{% endif %}"
+     href="{{ url_for('datamanager.data') }}">⚙ Manage data</a>
+  {% endif %}
+</nav>
+{% endif %}

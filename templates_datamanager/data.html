@@ -30,12 +30,12 @@
 </head>
 <body class="page">
   {% include '_authstrip.html' %}
+  {% include '_adminnav.html' %}
   <div class="card wide">
     <h1>Manage data</h1>
     <p class="muted">
       Upload slides, organize them into cohorts, and assign cohorts to raters —
       no SSH or config editing.
-      &nbsp;<a href="{{ url_for('admin') }}">← admin</a>
     </p>
     <p class="dm-hint">
       patches dir: <span class="dm-mono">{{ patches_dir }}</span> ·
