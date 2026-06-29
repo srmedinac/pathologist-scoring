@@ -5,31 +5,31 @@ body.grade-page {
   margin: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: #111;
-  color: #f4f4f4;
+  background: #16110d;
+  color: #f1ece3;
 }
 
 body.grade-page .topbar {
-  background: #1c1c1c;
-  border-bottom: 1px solid #2a2a2a;
+  background: #1e1812;
+  border-bottom: 1px solid #2f2519;
   color: #f4f4f4;
 }
 body.grade-page .topbar .muted { color: #aaa; }
-body.grade-page .topbar a { color: #cde6ff; }
+body.grade-page .topbar a { color: #e89bb1; }
 body.grade-page .topbar-link {
   margin-right: 12px;
   text-decoration: none;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 6px;
-  background: #2a2a2a;
+  background: #2f2519;
 }
-body.grade-page .topbar-link:hover { background: #3a3a3a; }
+body.grade-page .topbar-link:hover { background: #42351f; }
 
 #grade-stage {
   position: relative;
   overflow: hidden;
-  background: #0a0a0a;
+  background: #0d0a07;
 }
 #osd {
   position: absolute; inset: 0;
@@ -37,7 +37,7 @@ body.grade-page .topbar-link:hover { background: #3a3a3a; }
   /* Placeholder thumbnail under the OSD canvas: while CIFS pulls in the
    * first real tiles, the rater sees a blurry slide instead of black. The
    * canvas paints opaque over it once tiles arrive. */
-  background-color: #0a0a0a;
+  background-color: #0d0a07;
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -69,24 +69,24 @@ body.grade-page .topbar-link:hover { background: #3a3a3a; }
 .grade-loading[hidden] { display: none; }
 .spinner {
   width: 44px; height: 44px;
-  border: 4px solid #444;
-  border-top-color: #cde6ff;
+  border: 4px solid #3a3026;
+  border-top-color: #e89bb1;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 body.grade-page .controls {
-  background: #1c1c1c;
-  border-top: 1px solid #2a2a2a;
+  background: #1e1812;
+  border-top: 1px solid #2f2519;
   padding: 12px 16px;
 }
 body.grade-page .controls .hint { color: #888; }
 body.grade-page .controls kbd {
-  background: #2a2a2a; color: #f4f4f4; border-color: #3a3a3a;
+  background: #2f2519; color: #f4f4f4; border-color: #42351f;
 }
 body.grade-page .ans-btn.chosen {
-  outline: 3px solid #cde6ff;
+  outline: 3px solid #e89bb1;
   outline-offset: 2px;
 }
 

@@ -6,33 +6,53 @@
   <title>Manage data — {{ cfg.study_title }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <style>
-    .dm-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 18px; }
-    .dm-tab { padding: 8px 14px; border: 1px solid #d6dce2; border-radius: 8px;
-              background: #f5f7f9; cursor: pointer; font-size: 14px; font-weight: 600; }
-    .dm-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .dm-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 18px 0 20px;
+               border-bottom: 1.5px solid var(--line); padding-bottom: 0; }
+    .dm-tab { padding: 10px 16px; border: 1px solid var(--line); border-bottom: none;
+              border-radius: 9px 9px 0 0; background: var(--paper-2); cursor: pointer;
+              font-size: 14px; font-weight: 600; color: var(--ink-2); margin-bottom: -1.5px;
+              transition: background .12s, color .12s; }
+    .dm-tab:hover { color: var(--eosin); }
+    .dm-tab.active { background: var(--panel); color: var(--eosin); border-color: var(--line);
+                     border-bottom: 1.5px solid var(--panel); }
+    .dm-tab .dm-step { font-family: var(--mono); font-size: 11px; color: var(--muted);
+                       margin-right: 5px; }
+    .dm-tab.active .dm-step { color: var(--eosin); }
     .dm-panel { display: none; }
-    .dm-panel.active { display: block; }
-    .dm-cohorts-checks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-    .dm-cohorts-checks label { font-size: 13px; white-space: nowrap; }
-    .dm-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
-    .dm-folderlist { font-size: 12px; color: #51606e; word-break: break-word; }
-    .dm-warn { background: #fff4e5; border: 1px solid #f0c98a; color: #7a4a00;
-               border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
-    .dm-danger { background: #fdecea; border: 1px solid #f0b3ad; color: #8a1c12;
-                 border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
-    .dm-status { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
-                 background: #f5f7f9; border: 1px solid #e0e6eb; border-radius: 8px;
-                 padding: 10px 12px; margin-top: 10px; white-space: pre-wrap; }
+    .dm-panel.active { display: block; animation: dm-fade .25s ease both; }
+    @keyframes dm-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .dm-cohorts-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+    .dm-cohorts-checks label { font-size: 13px; white-space: nowrap; cursor: pointer; }
+    .dm-cohorts-checks input { accent-color: var(--eosin); }
+    .dm-mono { font-family: var(--mono); font-size: 12px; }
+    .dm-folderlist { font-size: 12px; color: var(--muted); word-break: break-word; font-family: var(--mono); }
+    .dm-warn { background: #fbf2da; border: 1px solid #e7d4a0; color: var(--ink-2);
+               border-radius: 9px; padding: 11px 13px; margin: 10px 0; font-size: 13.5px; line-height: 1.5; }
+    .dm-danger { background: #f8e3df; border: 1px solid #e7b6ad; color: #8c2a1e;
+                 border-radius: 9px; padding: 11px 13px; margin: 10px 0; line-height: 1.5; }
+    .dm-status { font-family: var(--mono); font-size: 13px; color: var(--ink);
+                 background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px;
+                 padding: 11px 13px; margin-top: 10px; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
     .dm-row-actions button { margin-right: 6px; }
     .dm-section { margin: 18px 0; }
-    .dm-hint { font-size: 12px; color: #6a7682; }
-    .dm-struct { background: #f5f7f9; border: 1px solid #e0e6eb; border-radius: 8px;
-                 padding: 12px 14px; margin: 12px 0; font-size: 13px; }
-    .dm-struct pre { margin: 8px 0; padding: 10px 12px; background: #fff;
-                     border: 1px solid #e0e6eb; border-radius: 6px; overflow-x: auto; }
-    .dm-note { font-size: 12.5px; color: #51606e; background: #eef4fb;
-               border: 1px solid #c8d8ed; border-radius: 8px; padding: 10px 12px;
-               margin-top: 14px; line-height: 1.5; }
+    .dm-hint { font-size: 12px; color: var(--muted); }
+    .dm-struct { background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px;
+                 padding: 13px 15px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
+    .dm-struct pre { margin: 9px 0; padding: 11px 13px; background: var(--panel);
+                     border: 1px solid var(--line); border-radius: 7px; overflow-x: auto;
+                     font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+    .dm-note { font-size: 12.5px; color: var(--ink-2); background: var(--hema-tint);
+               border: 1px solid #cdc7e0; border-radius: 9px; padding: 11px 13px;
+               margin-top: 14px; line-height: 1.55; }
+    /* "how it works" stepper */
+    .dm-flow { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 18px; }
+    .dm-flow-step { flex: 1; min-width: 180px; background: var(--paper-2);
+                    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .dm-flow-step b { display: block; font-family: var(--serif); font-size: 15px; margin-bottom: 2px; }
+    .dm-flow-num { font-family: var(--mono); font-size: 12px; color: var(--eosin); font-weight: 600; }
+    .dm-flow-step small { color: var(--muted); font-size: 12.5px; line-height: 1.45; display: block; }
+    .dm-apply-hint { background: var(--eosin-tint); border: 1px solid #e2c0cd; color: var(--eosin-deep);
+                     border-radius: 9px; padding: 10px 13px; margin: 12px 0; font-size: 13px; font-weight: 500; }
   </style>
 </head>
 <body class="page">
@@ -41,27 +61,36 @@
   <div class="card wide">
     <h1>Manage data</h1>
     <p class="muted">
-      Upload slides, organize them into cohorts, and assign cohorts to raters —
-      no SSH or config editing.
+      Add slides, group them into cohorts, and choose who reviews what — all from
+      here, no SSH or config editing.
     </p>
+
+    <div class="dm-flow">
+      <div class="dm-flow-step"><span class="dm-flow-num">1</span> <b>Upload</b>
+        <small>Add a cohort — a folder of slide subfolders.</small></div>
+      <div class="dm-flow-step"><span class="dm-flow-num">2</span> <b>Apply</b>
+        <small>Update the review set with new slides &amp; cohort changes.</small></div>
+      <div class="dm-flow-step"><span class="dm-flow-num">3</span> <b>Assign</b>
+        <small>Pick which cohorts each rater sees — instant, no apply step.</small></div>
+    </div>
     <p class="dm-hint">
       patches dir: <span class="dm-mono">{{ patches_dir }}</span> ·
       mode: <b>{{ detection_mode }}</b>
     </p>
 
     <div class="dm-tabs">
-      <div class="dm-tab active" data-panel="assign">Assign raters</div>
+      <div class="dm-tab active" data-panel="upload">Upload</div>
       <div class="dm-tab" data-panel="organize">Organize cohorts</div>
-      <div class="dm-tab" data-panel="upload">Upload slide</div>
-      <div class="dm-tab" data-panel="rebuild">Rebuild &amp; apply</div>
+      <div class="dm-tab" data-panel="rebuild">Apply changes</div>
+      <div class="dm-tab" data-panel="assign">Assign raters</div>
     </div>
 
     <!-- ============================ ASSIGN ============================ -->
-    <section class="dm-panel active" id="panel-assign">
+    <section class="dm-panel" id="panel-assign">
       <h2>Assign raters to cohorts</h2>
       <p class="muted">
         Tick the cohorts a rater should see. Tick <b>none</b> → that rater sees
-        <b>all</b> cohorts. Takes effect immediately (no rebuild, no restart) on
+        <b>all</b> cohorts. Takes effect immediately (no apply step, no restart) on
         the rater's next page load.
       </p>
       {% if not cohorts %}
@@ -105,10 +134,11 @@
     <section class="dm-panel" id="panel-organize">
       <h2>Cohorts</h2>
       <p class="muted">
-        A cohort is a named set of glob patterns matched against each slide
-        folder's name (e.g. <span class="dm-mono">um*</span> → cohort
-        <b>upmc</b>). Editing patterns never moves files — it only changes how
-        slides are grouped, applied on the next <b>Rebuild</b>.
+        A cohort is a named group of slides, matched by a simple name pattern
+        (e.g. <span class="dm-mono">um*</span> means "every slide whose folder
+        starts with <span class="dm-mono">um</span>" → cohort <b>upmc</b>).
+        Editing patterns never moves or deletes any files — it only regroups
+        slides. Changes take effect when you <b>Apply changes</b>.
       </p>
       <div class="table-scroll">
         <table class="data-table" id="cohorts-table">
@@ -160,19 +190,19 @@
     </section>
 
     <!-- ============================ UPLOAD ============================ -->
-    <section class="dm-panel" id="panel-upload">
+    <section class="dm-panel active" id="panel-upload">
       <h2>Upload a cohort</h2>
       {% if not upload_enabled %}
         <div class="dm-warn">
           Upload is disabled for <b>{{ detection_mode }}</b> mode — its candidates
           come from <span class="dm-mono">coords_root</span>, not
           <span class="dm-mono">patches_dir</span>, so uploaded folders wouldn't
-          be picked up. Add data for this study out-of-band, then Rebuild.
+          be picked up. Add data for this study out-of-band, then Apply changes.
         </div>
       {% else %}
         <p class="muted">
           Pick a folder of slides (a whole cohort, or any subset). Each slide is
-          uploaded separately, then run <b>Rebuild</b> to add them to the review set.
+          uploaded separately, then <b>Apply changes</b> to add them to the review set.
         </p>
 
         <div class="dm-struct">
@@ -206,12 +236,17 @@
 
         <div class="dm-status" id="upload-log" style="display:none"></div>
 
+        <div class="dm-apply-hint">
+          After uploading, go to <b>Apply changes</b> to add the new slides to the
+          review set.
+        </div>
+
         <div class="dm-note">
           <b>How big can this be?</b> Uploads go over HTTPS through Cloudflare,
           which caps <b>each request at 100 MB</b> on the free plan — so a cohort is
           sent <b>one slide at a time</b> (a slide is typically ~50 MB). Any single
           slide over ~95 MB is skipped here; copy those to the server directly
-          (rsync/scp) and just hit Rebuild. Re-uploading an existing slide folder is
+          (rsync/scp), then Apply changes. Re-uploading an existing slide folder is
           rejected (it would re-map already-answered detections).
         </div>
       {% endif %}
@@ -219,22 +254,23 @@
 
     <!-- ============================ REBUILD ============================ -->
     <section class="dm-panel" id="panel-rebuild">
-      <h2>Rebuild &amp; apply</h2>
+      <h2>Apply changes</h2>
       <p class="muted">
-        Rescans patches_dir, rebuilds the manifest, and hot-swaps it into the
-        live app — no restart. Existing answers keep their patches (ids are
-        content-addressed). Run this after uploading slides or editing cohorts.
+        Click this <b>after uploading slides or editing cohorts</b> to make them
+        live. It rescans the data and updates the review set in place — no restart,
+        and existing answers stay attached to their patches. (Assigning raters does
+        <i>not</i> need this — it's instant.)
       </p>
       {% if unmigrated %}
         <div class="dm-danger">
-          <strong>Rebuild is locked.</strong> This deployment still has
-          positional-id results that haven't been migrated to stable ids.
-          Rebuilding now would orphan every prior answer. Run the stable-id
-          migration first (see <span class="dm-mono">migrate_stable_ids.py</span>).
+          <strong>Locked for now.</strong> This study still has old-format results
+          that need a one-time migration before changes can be applied (otherwise
+          prior answers would be lost). Ask the maintainer to run the stable-id
+          migration (<span class="dm-mono">migrate_stable_ids.py</span>) first.
         </div>
       {% endif %}
-      <button id="rebuild-btn" class="btn-primary" {% if unmigrated %}disabled{% endif %}>
-        Rebuild &amp; apply now
+      <button id="rebuild-btn" class="btn-primary" style="width:auto" {% if unmigrated %}disabled{% endif %}>
+        Apply changes now
       </button>
       <div class="dm-status" id="rebuild-status">{{ rebuild.state }}{% if rebuild.message %} — {{ rebuild.message }}{% endif %}</div>
     </section>

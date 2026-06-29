@@ -69,7 +69,7 @@ document.querySelectorAll("#cohorts-table tr[data-cohort]").forEach((tr) => {
     editBtn.disabled = true;
     try {
       await api("/admin/data/cohort", { action: "edit", name, patterns });
-      setMsg(`Saved patterns for ${name}. Rebuild to apply to the review set.`, true);
+      setMsg(`Saved patterns for ${name}. Use "Apply changes" to update the review set.`, true);
       setTimeout(() => location.reload(), 800);
     } catch (e) {
       setMsg(`Error: ${e.message}`, false);
@@ -181,7 +181,7 @@ uploadForm && uploadForm.addEventListener("submit", async (e) => {
       else { fail++; line(`${tag}: ✗ ${d.error || ("HTTP " + r.status)}`); }
     } catch (err) { fail++; line(`${tag}: ✗ ${err.message}`); }
   }
-  line(`\nDone — ${ok} uploaded, ${skip} skipped, ${fail} failed. Switch to Rebuild to add them.`);
+  line(`\nDone — ${ok} uploaded, ${skip} skipped, ${fail} failed. Now go to "Apply changes" to add them.`);
   setMsg(`Cohort upload: ${ok} uploaded, ${skip} skipped, ${fail} failed`, fail === 0);
   submit.disabled = false;
 });
@@ -207,7 +207,7 @@ async function pollStatus() {
       setMsg(s.message, true);
       setTimeout(() => location.reload(), 1500);  // refresh counts/match
     } else if (s.state === "error") {
-      setMsg("Rebuild error: " + s.message, false);
+      setMsg("Apply changes failed: " + s.message, false);
     }
   } catch (_) { /* transient */ }
 }
@@ -221,7 +221,7 @@ rebuildBtn && rebuildBtn.addEventListener("click", async () => {
     if (!pollTimer) pollTimer = setInterval(pollStatus, 1500);
   } catch (e) {
     rebuildBtn.disabled = false;
-    setMsg("Could not start rebuild: " + e.message, false);
+    setMsg("Could not apply changes: " + e.message, false);
   }
 });
 
