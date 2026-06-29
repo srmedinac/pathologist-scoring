@@ -143,11 +143,21 @@ function groupSlides(files) {
   return slides;
 }
 
+// auto-fill the cohort name from the picked folder's name (editable)
+const uploadDir = $("upload-dir");
+uploadDir && uploadDir.addEventListener("change", () => {
+  const cohortEl = $("upload-cohort"), fs = Array.from(uploadDir.files || []);
+  if (fs.length && cohortEl && !cohortEl.value.trim()) {
+    cohortEl.value = (fs[0].webkitRelativePath || "").split("/")[0] || "";
+  }
+});
+
 uploadForm && uploadForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const files = Array.from($("upload-dir").files || []);
-  const dest = $("upload-dest").value.trim();
-  if (!files.length) { setMsg("Pick a folder of slides", false); return; }
+  const cohort = $("upload-cohort").value.trim();
+  if (!files.length) { setMsg("Pick a cohort folder of slides", false); return; }
+  if (!cohort) { setMsg("Enter a cohort name", false); return; }
 
   const slides = groupSlides(files);
   const names = Object.keys(slides).sort();
@@ -162,8 +172,8 @@ uploadForm && uploadForm.addEventListener("submit", async (e) => {
   const line = (t) => { log.textContent += t + "\n"; log.scrollTop = log.scrollHeight; };
   const mb = (b) => (b / 1048576).toFixed(1);
 
-  line(`Found ${names.length} slide(s)${dest ? " → under " + dest : ""}.`);
-  let ok = 0, skip = 0, fail = 0;
+  line(`Found ${names.length} slide(s) → cohort "${cohort}".`);
+  let ok = 0, skip = 0, fail = 0, lastMatch = null;
   for (let i = 0; i < names.length; i++) {
     const name = names[i], grp = slides[name];
     const size = grp.reduce((a, b) => a + b.file.size, 0);
@@ -171,17 +181,18 @@ uploadForm && uploadForm.addEventListener("submit", async (e) => {
     if (size > CAP) { line(`${tag}: SKIP — ${mb(size)} MB > 95 MB; copy to server directly`); skip++; continue; }
     const fd = new FormData();
     fd.append("slide", name);
-    if (dest) fd.append("dest", dest);
+    fd.append("cohort", cohort);
     for (const it of grp) { fd.append("file", it.file); fd.append("relpath", it.relpath); }
     line(`${tag}: uploading ${grp.length} files (${mb(size)} MB)…`);
     try {
       const r = await fetch("/admin/data/upload", { method: "POST", body: fd });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { ok++; line(`${tag}: ✓ done (cohort: ${d.cohort})`); }
+      if (r.ok) { ok++; lastMatch = d.matched_cohort; line(`${tag}: ✓ done`); }
       else { fail++; line(`${tag}: ✗ ${d.error || ("HTTP " + r.status)}`); }
     } catch (err) { fail++; line(`${tag}: ✗ ${err.message}`); }
   }
-  line(`\nDone — ${ok} uploaded, ${skip} skipped, ${fail} failed. Now go to "Apply changes" to add them.`);
+  line(`\nDone — ${ok} uploaded, ${skip} skipped, ${fail} failed.`);
+  if (ok) line(`Cohort "${cohort}" → ${lastMatch}. Now go to "Apply changes" to add them.`);
   setMsg(`Cohort upload: ${ok} uploaded, ${skip} skipped, ${fail} failed`, fail === 0);
   submit.disabled = false;
 });

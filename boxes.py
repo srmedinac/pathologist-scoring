@@ -264,18 +264,25 @@ def build_coord_index(patches_dir, cfg):
 
 
 def yolo_subdir_path(patches_dir, fullpath, labels_subdir):
-    """For a patch at <patches_dir>/<slide>/.../<stem>.<ext>, return the
-    YOLO label path <patches_dir>/<slide>/<labels_subdir>/<stem>.txt.
+    """Resolve the YOLO label .txt for a patch image, where the slide folder has
+    a sibling <labels_subdir>/ holding one .txt per image.
 
-    Matches the conventional YOLO layout where each slide folder has a
-    sibling labels/ subdir; works whether patches live directly under the
-    slide folder or one level deeper (e.g. <slide>/images/<patch>.jpeg)."""
+    Resolved RELATIVE TO THE IMAGE (not a fixed path segment), so it works at any
+    nesting depth under patches_dir — flat <slide>/... and nested
+    <cohort>/<slide>/... alike — and whether the image sits directly in the slide
+    folder (<slide>/<stem>.ext -> <slide>/labels/<stem>.txt) or one level deeper
+    in a clean/images subfolder (<slide>/clean/<stem>.ext -> <slide>/labels/
+    <stem>.txt). Returns the candidate that exists, else the one-level-up
+    candidate (the caller checks os.path.exists)."""
     rel = os.path.relpath(fullpath, patches_dir)
-    parts = rel.split(os.sep)
-    if len(parts) < 2:
+    if os.sep not in rel:                 # image directly under patches_dir, no slide folder
         return None
-    stem = os.path.splitext(parts[-1])[0]
-    return os.path.join(patches_dir, parts[0], labels_subdir, stem + ".txt")
+    d = os.path.dirname(fullpath)
+    stem = os.path.splitext(os.path.basename(fullpath))[0]
+    direct = os.path.join(d, labels_subdir, stem + ".txt")   # image in the slide folder
+    if os.path.exists(direct):
+        return direct
+    return os.path.join(os.path.dirname(d), labels_subdir, stem + ".txt")  # image in clean/ etc.
 
 
 def detections_for_image(relpath, fullpath, img, cfg, coord_index):

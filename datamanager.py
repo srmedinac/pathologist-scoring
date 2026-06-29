@@ -507,13 +507,18 @@ def upload():
                              % (MAX_UPLOAD_BYTES // (1024 * 1024))), 413
 
     slide = (request.form.get("slide") or "").strip()
-    dest = (request.form.get("dest") or "").strip()
-    for label, seg in (("slide", slide), ("dest", dest)):
-        if seg and ("/" in seg or "\\" in seg or not _SAFE_SEGMENT.match(seg)):
+    cohort = (request.form.get("cohort") or "").strip()
+    # Every upload is namespaced under a COHORT folder: patches_dir/<cohort>/<slide>/.
+    # This is what lets the SAME slide/image names live in different cohorts without
+    # colliding — distinct relative paths => distinct content-addressed patch_ids,
+    # so nothing from another cohort is ever replaced. The "already exists" check is
+    # therefore per-(cohort, slide), never across cohorts.
+    if not cohort:
+        return jsonify(error="missing cohort name (uploads are grouped by cohort)"), 400
+    for label, seg in (("slide", slide), ("cohort", cohort)):
+        if not seg or "/" in seg or "\\" in seg or not _SAFE_SEGMENT.match(seg):
             return jsonify(error="%s name must be a single safe segment "
                                  "(letters, digits, space, _ . -)" % label), 400
-    if not slide:
-        return jsonify(error="missing slide folder name"), 400
 
     files = request.files.getlist("file")
     relpaths = request.form.getlist("relpath")
@@ -525,12 +530,13 @@ def upload():
     root = _patches_root()
     if not os.path.isdir(root):
         return jsonify(error="patches_dir does not exist on disk: %s" % root), 400
-    slide_rel = os.path.join(dest, slide) if dest else slide
+    slide_rel = os.path.join(cohort, slide)
     slide_root = os.path.join(root, slide_rel)
     if os.path.exists(slide_root):
-        return jsonify(error="slide folder '%s' already exists — re-uploading is "
-                             "not allowed (it would re-map already-answered "
-                             "detections). Rename or remove it first." % slide_rel), 409
+        return jsonify(error="slide '%s' already exists in cohort '%s' — re-uploading "
+                             "the same slide into the same cohort is not allowed (it "
+                             "would re-map already-answered detections). The same slide "
+                             "name in a DIFFERENT cohort is fine." % (slide, cohort)), 409
 
     # validate every target BEFORE writing anything
     try:
@@ -546,11 +552,11 @@ def upload():
         _rmtree_quiet(slide_root)
         return jsonify(error="write failed for '%s': %s" % (slide, e)), 500
 
-    # cohort_for keys off the TOP path segment (dest if nested, else the slide)
-    cohort = _APP.cohort_for(dest or slide, _APP.CFG)
-    return jsonify(ok=True, slide=slide, dest=dest, n_files=len(files),
-                   cohort=cohort or "(unmatched)",
-                   note="run Rebuild to add these patches to the review set")
+    # cohort_for keys off the TOP path segment (the cohort folder)
+    matched = _APP.cohort_for(cohort, _APP.CFG)
+    return jsonify(ok=True, slide=slide, cohort=cohort, n_files=len(files),
+                   matched_cohort=matched or "(no cohort pattern matches '%s' yet)" % cohort,
+                   note="run Apply changes to add these patches to the review set")
 
 
 def _rmtree_quiet(path):

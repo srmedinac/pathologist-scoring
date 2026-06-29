@@ -229,35 +229,38 @@
         </div>
       {% else %}
         <p class="muted">
-          Pick a folder of slides (a whole cohort, or any subset). Each slide is
-          uploaded separately, then <b>Apply changes</b> to add them to the review set.
+          Pick a folder of slides and give it a <b>cohort name</b>. Slides are stored
+          under that cohort (<span class="dm-mono">patches_dir/&lt;cohort&gt;/&lt;slide&gt;/</span>),
+          so the <b>same slide or image names can appear in different cohorts without
+          clashing</b> — nothing from another cohort is ever replaced. Each slide is
+          uploaded separately; then <b>Apply changes</b> to add them to the review set.
         </p>
 
         <div class="dm-struct">
-          <b>Expected folder structure</b> — one subfolder per slide:
-<pre class="dm-mono">my_cohort/                 ← the folder you pick
-  um072/                   ← one slide (folder name = slide id)
-    clean/   *.jpeg        ← tile images (or put images at the slide root)
-    labels/  *.txt         ← one YOLO .txt per image (same basename)
-  um073/
-    clean/   *.jpeg
-    labels/  *.txt
-  …</pre>
-          Name slide folders with the cohort prefix (e.g. <span class="dm-mono">um*</span> → cohort
-          <b>upmc</b>), or add a matching pattern in <b>Organize cohorts</b>. Picking a single
-          slide folder (one that directly contains <span class="dm-mono">labels/</span>) uploads
-          just that slide.
+          <b>Expected folder structure</b> — the folder you pick is the cohort, with one
+          subfolder per slide. It lands on the server as:
+<pre class="dm-mono">patches_dir/
+  &lt;cohort&gt;/                 ← the cohort name (from the folder you pick)
+    um072/                  ← one slide
+      clean/   *.jpeg       ← tile images (or images at the slide root)
+      labels/  *.txt        ← one YOLO .txt per image (same basename)
+    um073/
+      clean/   *.jpeg
+      labels/  *.txt</pre>
+          After uploading, make sure a cohort in <b>Organize cohorts</b> has a pattern
+          matching <span class="dm-mono">&lt;cohort&gt;</span> (e.g. the exact name) so raters
+          can be assigned to it.
         </div>
 
         <form id="upload-form" class="add-rater">
           <div>
-            <label class="field-label">Cohort / slides folder</label>
+            <label class="field-label">Cohort folder (of slides)</label>
             <input type="file" id="upload-dir" webkitdirectory directory multiple required>
           </div>
           <div>
-            <label class="field-label">Put under subfolder (optional)</label>
-            <input type="text" id="upload-dest"
-                   placeholder="(blank = slide folders go directly under patches_dir)">
+            <label class="field-label">Cohort name (required)</label>
+            <input type="text" id="upload-cohort" required pattern="[A-Za-z0-9 _.\-]+"
+                   placeholder="auto-filled from the folder you pick">
           </div>
           <button type="submit">Upload cohort</button>
         </form>
@@ -274,8 +277,9 @@
           which caps <b>each request at 100 MB</b> on the free plan — so a cohort is
           sent <b>one slide at a time</b> (a slide is typically ~50 MB). Any single
           slide over ~95 MB is skipped here; copy those to the server directly
-          (rsync/scp), then Apply changes. Re-uploading an existing slide folder is
-          rejected (it would re-map already-answered detections).
+          (rsync/scp), then Apply changes. The only thing rejected is re-uploading
+          the <b>same slide into the same cohort</b> — that would re-map
+          already-answered detections; the same name in a different cohort is fine.
         </div>
       {% endif %}
     </section>
