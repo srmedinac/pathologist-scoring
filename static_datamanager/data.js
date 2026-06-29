@@ -320,3 +320,99 @@ if ($("panel-settings")) {
     });
   });
 }
+
+// ---- COHORT MATCH PREVIEW (live, as you type) ----------------------------
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+async function fetchCohortPreview(name, patterns) {
+  const qs = new URLSearchParams();
+  if (name) qs.set("name", name);
+  patterns.forEach((p) => qs.append("pat", p));
+  const r = await fetch("/admin/data/cohort/preview?" + qs.toString());
+  return r.ok ? r.json() : null;
+}
+function renderMatch(el, d) {
+  if (!d) { el.textContent = ""; return; }
+  el.textContent = (d.matched.join(", ") || "—")
+    + "  ·  " + d.matched_count + " matched · " + d.unassigned + " of " + d.total + " folders unassigned";
+}
+const _previewSeq = new WeakMap();        // per-field latest-wins token
+function wireCohortPreview(input, nameFn, target) {
+  const run = debounce(async () => {
+    const tok = (_previewSeq.get(input) || 0) + 1; _previewSeq.set(input, tok);
+    const d = await fetchCohortPreview(nameFn(), parsePatterns(input.value));
+    if (_previewSeq.get(input) === tok) renderMatch(target, d);   // drop stale responses
+  }, 250);
+  input.addEventListener("input", run);
+}
+document.querySelectorAll("#cohorts-table tr[data-cohort]").forEach((tr) => {
+  const inp = tr.querySelector(".dm-patterns"), cell = tr.querySelector(".dm-folderlist");
+  if (inp && cell) wireCohortPreview(inp, () => tr.dataset.cohort, cell);
+});
+(() => {
+  const inp = $("new-cohort-patterns"), nameEl = $("new-cohort-name"), tgt = $("new-cohort-preview");
+  if (inp && tgt) {
+    wireCohortPreview(inp, () => (nameEl && nameEl.value.trim()) || "", tgt);
+    if (nameEl) nameEl.addEventListener("input", () => inp.dispatchEvent(new Event("input")));
+  }
+})();
+
+// ---- BULK ASSIGN (submit only the rows you changed) ----------------------
+function rowCohorts(tr) {
+  return Array.from(tr.querySelectorAll(".dm-cohort-cb")).filter((cb) => cb.checked)
+    .map((cb) => cb.value).sort();
+}
+const _assignInitial = {};
+document.querySelectorAll("#assign-table tr[data-rater]").forEach((tr) => {
+  _assignInitial[tr.dataset.rater] = rowCohorts(tr).join("|");
+});
+const assignAllBtn = $("assign-save-all");
+assignAllBtn && assignAllBtn.addEventListener("click", async () => {
+  const assignments = {};
+  document.querySelectorAll("#assign-table tr[data-rater]").forEach((tr) => {
+    const cur = rowCohorts(tr);
+    if (cur.join("|") !== _assignInitial[tr.dataset.rater]) assignments[tr.dataset.rater] = cur;
+  });
+  if (!Object.keys(assignments).length) { setMsg("No assignment changes to save.", true); return; }
+  assignAllBtn.disabled = true;
+  try {
+    const d = await api("/admin/data/assign_bulk", { assignments });
+    setMsg(`Saved assignments for ${d.n} rater(s).`, true);
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { setMsg("Error saving assignments: " + e.message, false); assignAllBtn.disabled = false; }
+});
+
+// ---- APPLY DRY-RUN PREVIEW (what would Apply do) -------------------------
+const previewBtn = $("preview-btn");
+let previewTimer = null;
+async function pollPreview() {
+  try {
+    const s = await (await fetch("/admin/data/preview/status")).json();
+    const st = $("preview-status"); st.style.display = "block";
+    st.textContent = s.state + (s.message ? " — " + s.message : "");
+    if (s.state === "running") return;
+    clearInterval(previewTimer); previewTimer = null;
+    if (previewBtn) previewBtn.disabled = false;
+    const box = $("preview-result"); box.style.display = "block";
+    if (s.state === "done") {
+      const danger = s.orphaned > 0;
+      box.className = danger ? "dm-danger" : "dm-apply-hint";
+      box.innerHTML = "Would <b>add " + s.added + "</b> and <b>remove " + s.removed + "</b> patches"
+        + " (" + s.n_patches + " total after Apply). "
+        + (danger
+            ? "<b>⚠ " + s.orphaned + " already-answered patches would be DROPPED</b> — those answers would be orphaned. Review before applying."
+            : "No already-answered patches would be dropped.");
+    } else if (s.state === "error") {
+      box.className = "dm-danger"; box.textContent = "Preview error: " + s.message;
+    }
+  } catch (_) { /* transient */ }
+}
+previewBtn && previewBtn.addEventListener("click", async () => {
+  if (window.DM && window.DM.unmigrated) return;
+  previewBtn.disabled = true;
+  $("preview-result").style.display = "none";
+  try {
+    await api("/admin/data/preview", {});
+    const st = $("preview-status"); st.style.display = "block"; st.textContent = "running — scanning…";
+    if (!previewTimer) previewTimer = setInterval(pollPreview, 1500);
+  } catch (e) { previewBtn.disabled = false; setMsg("Could not start preview: " + e.message, false); }
+});

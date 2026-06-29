@@ -33,6 +33,7 @@ Design notes:
 """
 
 import copy
+import json
 import os
 import re
 import shutil
@@ -62,6 +63,13 @@ _APP = None                                       # set by register() to the liv
 _REBUILD = {"state": "idle", "message": "", "started": "", "finished": "",
             "n_patches": None, "n_detections": None, "added": None, "removed": None}
 _REBUILD_LOCK = threading.Lock()                  # guards starting a rebuild
+
+# Background dry-run (Apply preview) status — computes the would-be manifest
+# WITHOUT writing manifest.json or swapping the live MANIFEST/ITEM_INDEX.
+_PREVIEW = {"state": "idle", "message": "", "started": "", "finished": "",
+            "added": None, "removed": None, "orphaned": None, "n_patches": None,
+            "n_detections": None, "orphaned_ids": []}
+_PREVIEW_LOCK = threading.Lock()
 
 
 def _now():
@@ -178,7 +186,43 @@ def data():
         admin_emails=cfg.get("admin_emails", []),
         curator_emails=cfg.get("curator_emails", []),
         sibling_studies=cfg.get("sibling_studies", []),
+        advanced=_advanced_config(cfg),
     )
+
+
+# Read-only "Advanced" view: build-time / locked keys, shown but NOT editable
+# here (they re-scan data or need a restart). ORDERED allowlist of (key, note);
+# iterating this — never cfg.items() — is what stops other keys leaking in.
+_REBUILD_NOTE = "Edit config.json, restart the app, then Apply changes."
+_RESTART_NOTE = "Edit config.json, then restart the app."
+_ADVANCED_KEYS = [
+    ("patches_dir", _REBUILD_NOTE), ("n_patches", _REBUILD_NOTE),
+    ("seed", "Sampling seed — held fixed for study integrity. " + _RESTART_NOTE),
+    ("detection_mode", _REBUILD_NOTE), ("coords_csv", _REBUILD_NOTE),
+    ("coords_root", _REBUILD_NOTE), ("tiles_subdir", _REBUILD_NOTE),
+    ("labels_subdir", _REBUILD_NOTE), ("image_extensions", _REBUILD_NOTE),
+    ("green", _REBUILD_NOTE),
+    ("slides_dir", "Slide folder for /grade. " + _RESTART_NOTE + " Slide list is built via the build_slides CLI."),
+    ("secret_key", "Session-signing key. " + _RESTART_NOTE),
+    ("port", "Listening port. " + _RESTART_NOTE),
+]
+
+
+def _advanced_config(cfg):
+    """Build the read-only Advanced rows from the allowlist. secret_key is
+    redacted FIRST (its value never enters the result); dict/list values are
+    JSON-rendered so they're valid to copy back into config.json."""
+    rows = []
+    for key, note in _ADVANCED_KEYS:
+        if key == "secret_key":
+            display = "(set)" if cfg.get("secret_key") else "(not set)"
+        elif key not in cfg:
+            display = "(unset)"
+        else:
+            v = cfg[key]
+            display = json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+        rows.append({"key": key, "display": display, "note": note})
+    return rows
 
 
 def _clean_emails(lst):
@@ -300,6 +344,42 @@ def assign():
     return jsonify(ok=True, rater_cohorts=_APP.CFG.get("rater_cohorts") or {})
 
 
+@bp.route("/admin/data/assign_bulk", methods=["POST"])
+def assign_bulk():
+    """Apply many rater->cohort assignments in ONE all-or-nothing save_config
+    pass. Body {assignments: {rater: [cohorts]}}. Only the raters present in the
+    payload are touched (the client sends only rows the operator changed), so a
+    concurrent per-row edit to an untouched rater survives. Restart-free."""
+    _require_admin()
+    data = request.get_json(force=True) or {}
+    assignments = data.get("assignments")
+    if not isinstance(assignments, dict):
+        return jsonify(error="assignments must be an object"), 400
+    with _APP._lock:
+        fresh = _APP.load_config()
+        known = set(fresh.get("raters", []))
+        defined = set(fresh.get("cohorts") or {})
+        bad_raters = [r for r in assignments if r not in known]
+        bad_type = [r for r, c in assignments.items() if not isinstance(c, list)]
+        bad_cohorts = sorted({c for cl in assignments.values() if isinstance(cl, list)
+                              for c in cl if c not in defined})
+        if bad_type:
+            return jsonify(error="cohorts must be lists for: %s" % ", ".join(bad_type)), 400
+        if bad_raters:
+            return jsonify(error="unknown rater(s): %s" % ", ".join(bad_raters)), 400
+        if bad_cohorts:
+            return jsonify(error="unknown cohort(s): %s" % ", ".join(bad_cohorts)), 400
+        rc = fresh.setdefault("rater_cohorts", {})
+        for rater, cohorts in assignments.items():
+            if cohorts:
+                rc[rater] = cohorts
+            else:
+                rc.pop(rater, None)          # empty -> sees ALL cohorts
+        _APP.save_config(fresh)
+    return jsonify(ok=True, n=len(assignments),
+                   rater_cohorts=_APP.CFG.get("rater_cohorts") or {})
+
+
 # --------------------------------------------------------------------------
 # ORGANIZE — cohort definitions (glob patterns only; never touches disk)
 # --------------------------------------------------------------------------
@@ -361,6 +441,27 @@ def cohort():
                    rater_cohorts=_APP.CFG.get("rater_cohorts") or {},
                    match=_match_cohorts(_APP.CFG),
                    note="cohort membership updates on the next rebuild")
+
+
+@bp.route("/admin/data/cohort/preview")
+def cohort_preview():
+    """Live, non-mutating preview of which slide folders a cohort would OWN with
+    candidate patterns. Substitutes the patterns into the LIVE cohorts dict (in
+    place for an existing cohort, appended for a new one) and runs the production
+    app.cohort_for, so cross-cohort first-match-wins is reproduced exactly — the
+    preview can't claim a folder another cohort already owns.
+    Query: ?name=<cohort>&pat=<glob>&pat=...  (read-only; no save, no rebuild)."""
+    _require_admin()
+    name = (request.args.get("name") or "_preview").strip() or "_preview"
+    pats = [p.strip() for p in request.args.getlist("pat") if p.strip()]
+    cohorts = dict(_APP.CFG.get("cohorts") or {})     # preserves insertion order
+    cohorts[name] = pats                              # in-place if exists, else appended
+    probe = {"cohorts": cohorts}
+    folders = _slide_folders()
+    matched = [f for f in folders if _APP.cohort_for(f, probe) == name]
+    unassigned = sum(1 for f in folders if not _APP.cohort_for(f, probe))
+    return jsonify(matched=matched, matched_count=len(matched),
+                   unassigned=unassigned, total=len(folders))
 
 
 # --------------------------------------------------------------------------
@@ -513,6 +614,8 @@ def rebuild():
         return jsonify(error="This deployment still has positional-id results. "
                              "Run the stable-id migration before rebuilding, or "
                              "the rebuild would orphan every prior answer."), 409
+    if _PREVIEW.get("_running"):
+        return jsonify(error="a preview is running — wait for it to finish"), 409
     with _REBUILD_LOCK:
         if _REBUILD.get("_running"):
             return jsonify(error="a rebuild is already running"), 409
@@ -529,6 +632,74 @@ def rebuild():
 def rebuild_status():
     _require_admin()
     return jsonify({k: v for k, v in _REBUILD.items() if not k.startswith("_")})
+
+
+# --------------------------------------------------------------------------
+# DRY-RUN PREVIEW — what would Apply do? (added / removed / orphaned answers)
+# Builds the would-be manifest WITHOUT writing it or swapping the live globals.
+# --------------------------------------------------------------------------
+def _answered_patch_ids():
+    """Set of patch_ids that ANY rater has recorded an answer for. RESULTS is
+    nested rater -> {item_id: row}, so we iterate two levels (a flat
+    RESULTS.values() scan would yield zero and silently hide all orphans)."""
+    answered = set()
+    for rater in _APP.CFG.get("raters", []):
+        for row in _APP.RESULTS.get(rater, {}).values():
+            pid = row.get("patch_id")
+            if pid:
+                answered.add(pid)
+    return answered
+
+
+def _run_preview_bg():
+    try:
+        prior_ids = {p["patch_id"] for p in _APP.MANIFEST.get("patches", [])}
+        root = _patches_root()
+        if not os.path.isdir(root):
+            raise RuntimeError("patches_dir does not exist: %s" % root)
+        # build the would-be manifest WITHOUT writing it or swapping globals
+        new_manifest = _APP.compute_manifest(copy.deepcopy(_APP.CFG))
+        new_ids = {p["patch_id"] for p in new_manifest.get("patches", [])}
+        answered = _answered_patch_ids()
+        added, removed = new_ids - prior_ids, prior_ids - new_ids
+        orphaned = sorted(removed & answered)          # answered patches that would drop out
+        _PREVIEW.update(state="done", finished=_now(),
+                        added=len(added), removed=len(removed),
+                        orphaned=len(orphaned), orphaned_ids=orphaned[:200],
+                        n_patches=new_manifest["n_patches"],
+                        n_detections=new_manifest["n_detections"],
+                        message="would add %d, remove %d; %d answered patches would be dropped"
+                                % (len(added), len(removed), len(orphaned)))
+    except BaseException as e:                          # incl. SystemExit from compute_manifest
+        _PREVIEW.update(state="error", finished=_now(),
+                        message="%s: %s" % (type(e).__name__, e))
+    finally:
+        _PREVIEW["_running"] = False
+
+
+@bp.route("/admin/data/preview", methods=["POST"])
+def preview():
+    _require_admin()
+    if _is_unmigrated():
+        return jsonify(error="Migrate to stable ids before previewing a rebuild."), 409
+    if _REBUILD.get("_running"):
+        return jsonify(error="a rebuild is running — wait for it to finish"), 409
+    with _PREVIEW_LOCK:
+        if _PREVIEW.get("_running"):
+            return jsonify(error="a preview is already running"), 409
+        _PREVIEW.clear()
+        _PREVIEW.update(state="running", message="scanning…", started=_now(),
+                        finished="", _running=True, added=None, removed=None,
+                        orphaned=None, n_patches=None, n_detections=None, orphaned_ids=[])
+    threading.Thread(target=_run_preview_bg, daemon=True,
+                     name="datamanager-preview").start()
+    return jsonify(ok=True, state="running"), 202
+
+
+@bp.route("/admin/data/preview/status")
+def preview_status():
+    _require_admin()
+    return jsonify({k: v for k, v in _PREVIEW.items() if not k.startswith("_")})
 
 
 # --------------------------------------------------------------------------

@@ -143,9 +143,11 @@ def cohort_for(image_rel, cfg):
     return ""
 
 
-def build_manifest(cfg, force=False):
-    """Sample n_patches tiles and resolve their detections. Run once; the
-    saved manifest fixes the exact same set + boxes for every rater.
+def compute_manifest(cfg):
+    """Sample n_patches tiles and resolve their detections, RETURNING the
+    manifest dict WITHOUT writing it to disk. Shared by build_manifest (which
+    writes) and the data-manager's dry-run preview (which must not clobber the
+    live manifest.json).
 
     patch_id is content-addressed (boxes.stable_pid of the relative image path)
     so a rebuild after adding slides/cohorts never renumbers existing patches —
@@ -202,7 +204,7 @@ def build_manifest(cfg, force=False):
                 for k, d in enumerate(dets)],
         })
 
-    manifest = {
+    return {
         "created": now_iso(), "seed": cfg["seed"],
         "n_requested": target, "n_patches": len(patches),
         "n_detections": sum(len(p["detections"]) for p in patches),
@@ -210,6 +212,12 @@ def build_manifest(cfg, force=False):
         "candidates_scanned": len(cands), "skipped": skipped,
         "patches": patches,
     }
+
+
+def build_manifest(cfg, force=False):
+    """Build the manifest AND persist it atomically to MANIFEST_PATH. The dry-run
+    preview calls compute_manifest() directly to avoid this write."""
+    manifest = compute_manifest(cfg)
     tmp = MANIFEST_PATH + ".tmp"                    # atomic: no truncated manifest
     with open(tmp, "w") as fh:
         json.dump(manifest, fh, indent=1)
@@ -217,7 +225,7 @@ def build_manifest(cfg, force=False):
     print("manifest: %d tiles, %d detections (scanned %d candidates, "
           "skipped %d with no image / no boxes)"
           % (manifest["n_patches"], manifest["n_detections"],
-             len(cands), skipped))
+             manifest["candidates_scanned"], manifest["skipped"]))
     return manifest
 
 

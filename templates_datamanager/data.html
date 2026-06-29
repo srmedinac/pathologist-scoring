@@ -150,6 +150,8 @@
           </tbody>
         </table>
       </div>
+      <div><button id="assign-save-all" class="btn-primary" style="width:auto"
+        {% if not cohorts %}disabled{% endif %}>Save all assignments</button></div>
       <p class="dm-hint">New raters are added on the
         <a href="{{ url_for('admin_raters') }}">Raters</a> page (their email must
         also be on the Cloudflare Access allow-list).</p>
@@ -212,6 +214,7 @@
         </div>
         <button type="submit">Add cohort</button>
       </form>
+      <div id="new-cohort-preview" class="dm-folderlist" style="margin-top:8px"></div>
     </section>
 
     <!-- ============================ UPLOAD ============================ -->
@@ -294,9 +297,15 @@
           migration (<span class="dm-mono">migrate_stable_ids.py</span>) first.
         </div>
       {% endif %}
+      <p class="dm-hint">Not sure? <b>Preview</b> first to see how many patches would
+        be added/removed and whether any already-answered patches would be dropped.</p>
+      <button id="preview-btn" class="btn-secondary" style="width:auto;margin-right:8px"
+        {% if unmigrated %}disabled{% endif %}>Preview changes</button>
       <button id="rebuild-btn" class="btn-primary" style="width:auto" {% if unmigrated %}disabled{% endif %}>
         Apply changes now
       </button>
+      <div id="preview-result" style="display:none"></div>
+      <div class="dm-status" id="preview-status" style="display:none"></div>
       <div class="dm-status" id="rebuild-status">{{ rebuild.state }}{% if rebuild.message %} — {{ rebuild.message }}{% endif %}</div>
     </section>
 
@@ -360,6 +369,27 @@
         <div class="dm-elist" id="set-siblings"></div>
         <div><button class="set-save" data-section="display">Save display</button></div>
       </div>
+
+      <details class="dm-set-group">
+        <summary style="cursor:pointer;font-family:var(--serif);font-size:17px;font-weight:600">
+          Advanced (build-time / locked) configuration</summary>
+        <p class="dm-hint" style="margin-top:8px">These keys aren't editable here —
+          changing them re-scans the data set or restarts the server, and some can
+          orphan recorded answers. They're shown read-only; the last column says how
+          to change each.</p>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Key</th><th>Value</th><th>How to change</th></tr></thead>
+            <tbody>
+            {% for a in advanced %}
+              <tr><td><span class="dm-mono">{{ a.key }}</span></td>
+                <td><code class="dm-mono">{{ a.display }}</code></td>
+                <td class="dm-hint">{{ a.note }}</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </section>
 
     <p id="msg" class="rater-msg"></p>
