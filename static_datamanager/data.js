@@ -229,3 +229,94 @@ rebuildBtn && rebuildBtn.addEventListener("click", async () => {
 if (rebuildBtn && /running/.test($("rebuild-status").textContent)) {
   pollTimer = setInterval(pollStatus, 1500);
 }
+
+// ---- SETTINGS (all live; no restart) -------------------------------------
+const DM_SET = JSON.parse(($("dm-settings-data") || { textContent: "{}" }).textContent || "{}");
+
+function emailRow(val, isMe) {
+  const row = document.createElement("div"); row.className = "dm-erow";
+  const inp = document.createElement("input");
+  inp.type = "email"; inp.value = val || ""; inp.placeholder = "name@example.org";
+  if (isMe) inp.readOnly = true;
+  row.appendChild(inp);
+  if (isMe) {
+    const y = document.createElement("span"); y.className = "dm-you"; y.textContent = "(you)";
+    row.appendChild(y);
+  } else {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "dm-erm"; b.textContent = "×"; b.title = "remove";
+    b.onclick = () => row.remove();
+    row.appendChild(b);
+  }
+  return row;
+}
+function renderEmails(id, emails, me) {
+  const c = $(id); if (!c) return; c.innerHTML = "";
+  (emails || []).forEach((e) => c.appendChild(emailRow(e, me && e.toLowerCase() === me.toLowerCase())));
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "dm-eadd"; add.textContent = "+ add email";
+  add.onclick = () => { const r = emailRow("", false); c.insertBefore(r, add); r.querySelector("input").focus(); };
+  c.appendChild(add);
+}
+function collectEmails(id) {
+  return Array.from($(id).querySelectorAll(".dm-erow input")).map((i) => i.value.trim()).filter(Boolean);
+}
+function siblingRow(s) {
+  const row = document.createElement("div"); row.className = "dm-erow";
+  const n = document.createElement("input");
+  n.type = "text"; n.placeholder = "name (e.g. Tumor Buds)"; n.value = (s && s.name) || "";
+  n.style.fontFamily = "var(--sans)"; n.style.flex = "0 0 34%";
+  const u = document.createElement("input");
+  u.type = "text"; u.placeholder = "https://…/admin"; u.value = (s && s.url) || "";
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "dm-erm"; b.textContent = "×"; b.onclick = () => row.remove();
+  row.append(n, u, b); return row;
+}
+function renderSiblings(list) {
+  const c = $("set-siblings"); if (!c) return; c.innerHTML = "";
+  (list || []).forEach((s) => c.appendChild(siblingRow(s)));
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "dm-eadd"; add.textContent = "+ add study link";
+  add.onclick = () => { const r = siblingRow(null); c.insertBefore(r, add); };
+  c.appendChild(add);
+}
+function collectSiblings() {
+  return Array.from($("set-siblings").querySelectorAll(".dm-erow")).map((r) => {
+    const ins = r.querySelectorAll("input");
+    return { name: ins[0].value.trim(), url: ins[1].value.trim() };
+  }).filter((s) => s.url);
+}
+
+if ($("panel-settings")) {
+  renderEmails("set-admins", DM_SET.admins, DM_SET.me);
+  renderEmails("set-curators", DM_SET.curators, null);
+  renderSiblings(DM_SET.siblings);
+
+  document.querySelectorAll("#panel-settings .set-save").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const sec = btn.dataset.section;
+      let body = {};
+      if (sec === "text") {
+        body = { study_title: $("set-title").value.trim(), instructions: $("set-instructions").value };
+      } else if (sec === "labels") {
+        const m = {};
+        document.querySelectorAll("#set-labels .set-label").forEach((i) => { m[i.dataset.opt] = i.value.trim(); });
+        body = { answer_labels: m };
+      } else if (sec === "access") {
+        body = { admin_emails: collectEmails("set-admins"), curator_emails: collectEmails("set-curators") };
+      } else if (sec === "display") {
+        body = { shuffle_per_rater: $("set-shuffle").checked, data_manager: $("set-datalink").checked,
+                 sibling_studies: collectSiblings() };
+      }
+      btn.disabled = true;
+      try {
+        await api("/admin/data/settings", body);
+        setMsg("Saved — applied live, no restart.", true);
+        setTimeout(() => location.reload(), 900);     // refresh against current config
+      } catch (e) {
+        setMsg("Error: " + e.message, false);
+        btn.disabled = false;
+      }
+    });
+  });
+}

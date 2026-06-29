@@ -75,7 +75,7 @@ a:hover { color: var(--eosin-deep); }
 }
 .card.wide { max-width: 1100px; margin: 0 auto; }
 .card h1 { margin: 0 0 10px; font-size: 31px; line-height: 1.06; }
-.card > .muted { font-size: 14px; }
+.card > .muted { font-size: 14px; white-space: pre-line; }
 
 .login { width: 392px; }
 .login h1 { font-size: 34px; }
@@ -161,7 +161,7 @@ input[type=password] {
 
 .help-box {
   background: var(--hema-tint); border-bottom: 1px solid #cdcbeb;
-  padding: 11px 18px; font-size: 14px; color: var(--ink-2);
+  padding: 11px 18px; font-size: 14px; color: var(--ink-2); white-space: pre-line;
 }
 
 /* ---- image stage (patch review) ---- */

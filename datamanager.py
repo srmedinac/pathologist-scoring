@@ -54,6 +54,8 @@ _POSITIONAL = re.compile(r"^p[0-9]{4}$")          # old positional patch_id form
 _SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,128}$")
 _COHORT_NAME = re.compile(r"^[A-Za-z0-9_\-]+$")
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 _APP = None                                       # set by register() to the live module
 
 # Background-rebuild status, polled by the UI. One rebuild at a time.
@@ -170,7 +172,103 @@ def data():
         progress=_rater_progress(),
         unmigrated=_is_unmigrated(),
         rebuild=dict((k, v) for k, v in _REBUILD.items() if not k.startswith("_")),
+        me=_APP.cf_access_email(),
+        answer_options=cfg.get("answer_options", []),
+        answer_labels=cfg.get("answer_labels") or {},
+        admin_emails=cfg.get("admin_emails", []),
+        curator_emails=cfg.get("curator_emails", []),
+        sibling_studies=cfg.get("sibling_studies", []),
     )
+
+
+def _clean_emails(lst):
+    """Lowercase, dedupe, and validate a list of emails (raises ValueError)."""
+    out, seen = [], set()
+    for e in lst or []:
+        e = (e or "").strip().lower()
+        if not e:
+            continue
+        if not _EMAIL_RE.match(e):
+            raise ValueError("not a valid email: %s" % e)
+        if e not in seen:
+            seen.add(e)
+            out.append(e)
+    return out
+
+
+@bp.route("/admin/data/settings", methods=["POST"])
+def settings():
+    """Edit study config LIVE — every key here is read per-request, so a
+    save_config() hot-swap takes effect on the next request with NO restart and
+    NO rebuild. Only the CHANGED keys are sent; each is validated + guarded."""
+    _require_admin()
+    data = request.get_json(force=True) or {}
+    with _APP._lock:
+        fresh = _APP.load_config()
+
+        if "study_title" in data:
+            t = (data.get("study_title") or "").strip()
+            if not t:
+                return jsonify(error="study title can't be empty"), 400
+            if len(t) > 120:
+                return jsonify(error="study title too long (max 120 chars)"), 400
+            fresh["study_title"] = t
+
+        if "instructions" in data:
+            ins = (data.get("instructions") or "").strip()
+            if len(ins) > 4000:
+                return jsonify(error="instructions too long (max 4000 chars)"), 400
+            fresh["instructions"] = ins
+
+        if "answer_labels" in data:                       # cosmetic button wording
+            lbls = data.get("answer_labels") or {}
+            if not isinstance(lbls, dict):
+                return jsonify(error="answer_labels must be an object"), 400
+            opts = set(fresh.get("answer_options") or [])
+            fresh["answer_labels"] = {k: (str(v)[:60]).strip()
+                                      for k, v in lbls.items() if k in opts}
+
+        if "admin_emails" in data:                        # self-lockout guard
+            try:
+                admins = _clean_emails(data.get("admin_emails"))
+            except ValueError as e:
+                return jsonify(error=str(e)), 400
+            if not admins:
+                return jsonify(error="there must be at least one admin"), 400
+            me = (_APP.cf_access_email() or "").lower()
+            if me and me not in admins:
+                return jsonify(error="you can't remove your own admin access (%s) "
+                                     "— add another admin first or keep yourself." % me), 400
+            fresh["admin_emails"] = admins
+
+        if "curator_emails" in data:
+            try:
+                fresh["curator_emails"] = _clean_emails(data.get("curator_emails"))
+            except ValueError as e:
+                return jsonify(error=str(e)), 400
+
+        if "shuffle_per_rater" in data:
+            fresh["shuffle_per_rater"] = bool(data.get("shuffle_per_rater"))
+        if "data_manager" in data:
+            fresh["data_manager"] = bool(data.get("data_manager"))
+
+        if "sibling_studies" in data:
+            sibs = data.get("sibling_studies") or []
+            if not isinstance(sibs, list):
+                return jsonify(error="sibling_studies must be a list"), 400
+            clean = []
+            for s in sibs:
+                name = (s.get("name") or "").strip()
+                url = (s.get("url") or "").strip()
+                if not name and not url:
+                    continue
+                if not (url.startswith("http://") or url.startswith("https://")):
+                    return jsonify(error="study link URL must start with http:// or https://"), 400
+                clean.append({"name": name or url, "url": url})
+            fresh["sibling_studies"] = clean
+
+        _APP.save_config(fresh)
+    return jsonify(ok=True, note="applied live — no restart needed")
 
 
 # --------------------------------------------------------------------------

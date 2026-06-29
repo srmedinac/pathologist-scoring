@@ -53,6 +53,30 @@
     .dm-flow-step small { color: var(--muted); font-size: 12.5px; line-height: 1.45; display: block; }
     .dm-apply-hint { background: var(--eosin-tint); border: 1px solid #f3bcd2; color: var(--eosin-deep);
                      border-radius: 9px; padding: 10px 13px; margin: 12px 0; font-size: 13px; font-weight: 500; }
+    /* settings tab */
+    .dm-set-group { border: 1px solid var(--line); border-radius: 11px; padding: 16px 18px;
+                    margin: 14px 0; background: var(--panel); }
+    .dm-set-group h3 { margin: 0 0 4px; font-size: 17px; }
+    .dm-set-group input[type=text], .dm-set-group textarea {
+        width: 100%; padding: 9px 11px; font-size: 14px; font-family: var(--sans);
+        border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+    .dm-set-group textarea { resize: vertical; }
+    .dm-set-group .set-save { margin-top: 14px; padding: 9px 18px; font-size: 14px; font-weight: 600;
+        border: none; border-radius: 8px; background: var(--eosin); color: #fff; cursor: pointer; }
+    .dm-set-group .set-save:hover { filter: brightness(1.06); }
+    .dm-check { display: flex; align-items: center; gap: 9px; font-size: 14px; margin: 8px 0; cursor: pointer; }
+    .dm-check input { accent-color: var(--eosin); width: 16px; height: 16px; }
+    .dm-elist { display: flex; flex-direction: column; gap: 7px; margin: 4px 0 6px; }
+    .dm-erow { display: flex; gap: 8px; align-items: center; }
+    .dm-erow input { flex: 1; padding: 8px 11px; font-size: 14px; font-family: var(--mono);
+        border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+    .dm-erow .dm-erm { border: 1px solid var(--line); background: var(--panel); color: var(--no);
+        border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; flex: none; }
+    .dm-erow .dm-erm:hover { border-color: var(--no); }
+    .dm-erow .dm-you { font-size: 11px; color: var(--muted); flex: none; padding-right: 4px; }
+    .dm-eadd { align-self: flex-start; background: none; border: 1px dashed var(--line-2);
+        color: var(--eosin); border-radius: 8px; padding: 7px 13px; font-size: 13px; cursor: pointer; }
+    .dm-eadd:hover { border-color: var(--eosin); }
   </style>
 </head>
 <body class="page">
@@ -83,6 +107,7 @@
       <div class="dm-tab" data-panel="organize">Organize cohorts</div>
       <div class="dm-tab" data-panel="rebuild">Apply changes</div>
       <div class="dm-tab" data-panel="assign">Assign raters</div>
+      <div class="dm-tab" data-panel="settings">Settings</div>
     </div>
 
     <!-- ============================ ASSIGN ============================ -->
@@ -275,8 +300,73 @@
       <div class="dm-status" id="rebuild-status">{{ rebuild.state }}{% if rebuild.message %} — {{ rebuild.message }}{% endif %}</div>
     </section>
 
+    <!-- ============================ SETTINGS ============================ -->
+    <section class="dm-panel" id="panel-settings">
+      <h2>Study settings</h2>
+      <p class="muted">
+        Edit the study from here. Everything on this tab applies <b>live</b> — it
+        takes effect on the next page load, with no rebuild and no restart.
+      </p>
+
+      <div class="dm-set-group">
+        <h3>Study text</h3>
+        <label class="field-label">Title</label>
+        <input type="text" id="set-title" maxlength="120" value="{{ cfg.study_title }}">
+        <label class="field-label">Instructions (shown to raters)</label>
+        <textarea id="set-instructions" rows="3" maxlength="4000">{{ cfg.instructions }}</textarea>
+        <div><button class="set-save" data-section="text">Save study text</button></div>
+      </div>
+
+      <div class="dm-set-group">
+        <h3>Answer buttons</h3>
+        <p class="dm-hint">The wording on each review button. The underlying options
+          ({{ answer_options | join(', ') }}) are fixed for the study.</p>
+        <table class="data-table" id="set-labels">
+          <thead><tr><th>Option</th><th>Button label</th></tr></thead>
+          <tbody>
+          {% for opt in answer_options %}
+            <tr><td><span class="dm-mono">{{ opt }}</span></td>
+              <td><input type="text" class="set-label" data-opt="{{ opt }}" maxlength="60"
+                    value="{{ answer_labels.get(opt, opt|capitalize) }}"></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <div><button class="set-save" data-section="labels">Save labels</button></div>
+      </div>
+
+      <div class="dm-set-group">
+        <h3>Access</h3>
+        <p class="dm-hint">Who can reach the admin tools. Changes apply on each
+          person's next request. You can't remove your own admin access.</p>
+        <label class="field-label">Admins (full access)</label>
+        <div class="dm-elist" id="set-admins"></div>
+        <label class="field-label">Curators (curate page only)</label>
+        <div class="dm-elist" id="set-curators"></div>
+        <div class="dm-warn" style="margin-top:10px">New emails must <b>also</b> be on the
+          <a href="https://one.dash.cloudflare.com/?to=/:account/access/apps" target="_blank"
+             rel="noopener">Cloudflare Access allow-list</a>, or they can't reach the app at all.</div>
+        <div><button class="set-save" data-section="access">Save access</button></div>
+      </div>
+
+      <div class="dm-set-group">
+        <h3>Display</h3>
+        <label class="dm-check"><input type="checkbox" id="set-shuffle"
+          {% if cfg.get('shuffle_per_rater', True) %}checked{% endif %}>
+          Shuffle patch order per rater (removes order bias)</label>
+        <label class="dm-check"><input type="checkbox" id="set-datalink"
+          {% if cfg.get('data_manager', True) %}checked{% endif %}>
+          Show the “Manage data” link in the admin nav</label>
+        <label class="field-label">Linked studies (nav “switch to” links)</label>
+        <div class="dm-elist" id="set-siblings"></div>
+        <div><button class="set-save" data-section="display">Save display</button></div>
+      </div>
+    </section>
+
     <p id="msg" class="rater-msg"></p>
   </div>
+  <script type="application/json" id="dm-settings-data">
+    {{ {'admins': admin_emails, 'curators': curator_emails, 'siblings': sibling_studies, 'me': me} | tojson }}
+  </script>
 
   <script>
     window.DM = {{ {'upload_enabled': upload_enabled, 'unmigrated': unmigrated} | tojson }};
