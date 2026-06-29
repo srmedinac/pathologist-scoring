@@ -34,6 +34,8 @@
                  background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px;
                  padding: 11px 13px; margin-top: 10px; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
     .dm-row-actions button { margin-right: 6px; }
+    .dm-del { color: var(--no); border-color: #e7b6ad; }
+    .dm-del:hover { background: #fce4e4; border-color: var(--no); }
     .dm-section { margin: 18px 0; }
     .dm-hint { font-size: 12px; color: var(--muted); }
     .dm-struct { background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px;
@@ -181,7 +183,8 @@
               <td class="dm-row-actions">
                 <button class="cohort-edit">Save</button>
                 <button class="cohort-rename btn-secondary">Rename</button>
-                <button class="cohort-delete btn-secondary">Delete</button>
+                <button class="cohort-delete btn-secondary">Remove (keep files)</button>
+                <button class="cohort-deldata btn-secondary dm-del">Delete data</button>
               </td>
             </tr>
           {% endfor %}
@@ -215,6 +218,19 @@
         <button type="submit">Add cohort</button>
       </form>
       <div id="new-cohort-preview" class="dm-folderlist" style="margin-top:8px"></div>
+
+      <h3 style="margin-top:26px">Delete folders (removes image files)</h3>
+      <p class="dm-hint">Each folder under patches_dir (a slide, or a whole uploaded
+        cohort folder). Deleting moves it to a recoverable <b>trash</b> folder, then
+        takes effect when you <b>Apply changes</b>. Answered patches in a deleted
+        folder become orphaned — the count is shown before you confirm.</p>
+      <div class="table-scroll">
+        <table class="data-table" id="folders-table">
+          <thead><tr><th>Folder</th><th>Cohort</th><th>Patches</th><th>Answered</th><th></th></tr></thead>
+          <tbody><tr><td colspan="5" class="dm-hint">loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="dm-note" id="trash-line" style="display:none"></div>
     </section>
 
     <!-- ============================ UPLOAD ============================ -->

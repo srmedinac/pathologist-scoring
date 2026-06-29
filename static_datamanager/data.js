@@ -427,3 +427,75 @@ previewBtn && previewBtn.addEventListener("click", async () => {
     if (!previewTimer) previewTimer = setInterval(pollPreview, 1500);
   } catch (e) { previewBtn.disabled = false; setMsg("Could not start preview: " + e.message, false); }
 });
+
+// ---- DELETE DATA (folders on disk / a whole cohort) ----------------------
+function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+
+async function loadFolders() {
+  const tb = document.querySelector("#folders-table tbody");
+  if (!tb) return;
+  try {
+    const d = await (await fetch("/admin/data/folders")).json();
+    if (!d.folders || !d.folders.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="dm-hint">No folders on disk.</td></tr>';
+    } else {
+      tb.innerHTML = "";
+      d.folders.forEach((f) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td><span class="dm-mono">${escapeHtml(f.folder)}</span></td>`
+          + `<td>${escapeHtml(f.cohort || "—")}</td><td>${f.patches}</td>`
+          + `<td>${f.answered ? "<b style='color:var(--no)'>" + f.answered + "</b>" : "0"}</td>`
+          + `<td><button class="btn-secondary dm-del">Delete</button></td>`;
+        tr.querySelector("button").addEventListener("click", () => delFolder(f));
+        tb.appendChild(tr);
+      });
+    }
+    renderTrash(d);
+  } catch (_) {
+    tb.innerHTML = '<tr><td colspan="5" class="dm-hint">could not load folders</td></tr>';
+  }
+}
+function renderTrash(d) {
+  const el = $("trash-line"); if (!el) return;
+  if (!d.trash_count) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `Trash holds <b>${d.trash_count}</b> deleted folder(s) at `
+    + `<span class="dm-mono">${escapeHtml(d.trash)}</span>. Deleting is recoverable but `
+    + `<b>does not free disk space</b> — empty the trash to reclaim it. `
+    + `<button id="empty-trash" class="btn-secondary dm-del" style="margin-left:6px">Empty trash (free disk)</button>`;
+  $("empty-trash").addEventListener("click", async () => {
+    if (!confirm("Permanently delete ALL trashed folders? This frees disk space and CANNOT be undone.")) return;
+    try {
+      const r = await api("/admin/data/trash/empty", {});
+      setMsg(`Emptied trash — permanently removed ${r.removed} folder(s).`, true);
+      loadFolders();
+    } catch (e) { setMsg("Empty trash failed: " + e.message, false); }
+  });
+}
+async function delFolder(f) {
+  const warn = f.answered > 0
+    ? `\n\n⚠ ${f.answered} of its ${f.patches} patches are ALREADY ANSWERED — those answers will be orphaned after Apply.`
+    : "";
+  if (!confirm(`Delete folder "${f.folder}"?\nIt moves to a recoverable trash folder, then "Apply changes" drops it from the review set.${warn}`)) return;
+  try {
+    await api("/admin/data/delete", { folder: f.folder });
+    setMsg(`Deleted "${f.folder}" → trash. Now use "Apply changes" to update the review set.`, true);
+    loadFolders();
+  } catch (e) { setMsg("Delete failed: " + e.message, false); }
+}
+loadFolders();
+
+document.querySelectorAll("#cohorts-table tr[data-cohort] .cohort-deldata").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const name = btn.closest("tr").dataset.cohort;
+    if (!confirm(`Delete ALL data folders that belong to cohort "${name}"?\nThey move to a recoverable trash folder; their answered patches become orphaned after "Apply changes". (This does not remove the cohort definition.)`)) return;
+    btn.disabled = true;
+    try {
+      const d = await api("/admin/data/delete_cohort", { cohort: name });
+      const failed = (d.errors || []).length;
+      setMsg(`Cohort "${name}": moved ${d.deleted.length} folder(s) to trash (${d.answered} answered)`
+             + (failed ? ` — ${failed} FAILED: ${d.errors.join("; ")}` : ". Now Apply changes."), failed === 0);
+      loadFolders();
+    } catch (e) { setMsg("Delete failed: " + e.message, false); btn.disabled = false; }
+  });
+});

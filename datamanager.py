@@ -465,6 +465,160 @@ def cohort_preview():
 
 
 # --------------------------------------------------------------------------
+# DELETE DATA — soft-delete (move to a recoverable trash dir) top-level
+# folders (a slide, or a whole cohort folder). The trash lives OUTSIDE
+# patches_dir so build_manifest never re-scans it.
+# --------------------------------------------------------------------------
+def _trash_root():
+    pr = os.path.normpath(_patches_root())
+    return os.path.join(os.path.dirname(pr), "_datamanager_trash")
+
+
+def _busy():
+    """True while a rebuild or preview is scanning — deleting a folder mid-scan
+    could yield a partially-consistent manifest, so delete routes refuse then."""
+    return bool(_REBUILD.get("_running") or _PREVIEW.get("_running"))
+
+
+def _folder_impact(folder, answered=None):
+    """(n_patches, n_answered) currently in the live manifest for a top-level
+    folder — so the UI can warn how much answered work a delete would drop.
+    Pass `answered` (from _answered_patch_ids) to avoid recomputing per folder."""
+    if answered is None:
+        answered = _answered_patch_ids()
+    pref = folder.replace(os.sep, "/").rstrip("/") + "/"
+    n = a = 0
+    for p in _APP.MANIFEST.get("patches", []):
+        img = p.get("image", "")
+        if img == folder or img.startswith(pref):
+            n += 1
+            if p["patch_id"] in answered:
+                a += 1
+    return n, a
+
+
+def _valid_top_folder(folder):
+    """Resolve a single safe segment to an existing dir DIRECTLY under
+    patches_dir, rejecting traversal and symlinks. Returns abspath or None."""
+    if not folder or "/" in folder or "\\" in folder or not _SAFE_SEGMENT.match(folder):
+        return None
+    root = _patches_root()
+    raw = os.path.join(root, folder)
+    if os.path.islink(raw):                       # never follow a symlinked folder
+        return None
+    target = os.path.realpath(raw)
+    if os.path.dirname(target) != os.path.realpath(root) or not os.path.isdir(target):
+        return None
+    return target
+
+
+def _trash_folder(folder):
+    """Move one validated top-level folder into the trash dir. Returns dest."""
+    target = _valid_top_folder(folder)
+    if not target:
+        raise ValueError("folder '%s' not found under patches_dir" % folder)
+    trash = _trash_root()
+    os.makedirs(trash, exist_ok=True)
+    dest = os.path.join(trash, "%s__%s" % (folder, datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")))
+    shutil.move(target, dest)
+    return dest
+
+
+@bp.route("/admin/data/folders")
+def folders():
+    """List deletable top-level folders under patches_dir with their cohort and
+    how many patches / already-answered patches each holds (for the delete UI)."""
+    _require_admin()
+    answered = _answered_patch_ids()
+    out = []
+    for f in _slide_folders():
+        n, a = _folder_impact(f, answered)
+        out.append({"folder": f, "cohort": _APP.cohort_for(f, _APP.CFG) or "",
+                    "patches": n, "answered": a})
+    tr = _trash_root()
+    trash_count = len(os.listdir(tr)) if os.path.isdir(tr) else 0
+    return jsonify(folders=out, trash=tr, trash_count=trash_count)
+
+
+@bp.route("/admin/data/trash/empty", methods=["POST"])
+def trash_empty():
+    """Permanently delete everything in the trash dir — this is what actually
+    reclaims disk space (soft-delete only moves files aside)."""
+    _require_admin()
+    tr = _trash_root()
+    removed = 0
+    if os.path.isdir(tr):
+        for d in list(os.listdir(tr)):
+            try:
+                shutil.rmtree(os.path.join(tr, d)); removed += 1
+            except OSError:
+                pass
+    return jsonify(ok=True, removed=removed,
+                   note="permanently deleted — disk space reclaimed")
+
+
+@bp.route("/admin/data/delete", methods=["POST"])
+def delete_folder():
+    """Soft-delete ONE top-level folder (a slide or a cohort folder): move it to
+    the trash dir (recoverable). Takes effect on the review set at the next Apply."""
+    _require_admin()
+    if _busy():
+        return jsonify(error="a rebuild/preview is running — wait for it to finish"), 409
+    folder = ((request.get_json(force=True) or {}).get("folder") or "").strip()
+    target = _valid_top_folder(folder)
+    if not target:
+        return jsonify(error="folder '%s' not found under patches_dir" % folder), 404
+    n, a = _folder_impact(folder)
+    try:
+        dest = _trash_folder(folder)
+    except Exception as e:
+        return jsonify(error="delete failed: %s" % e), 500
+    return jsonify(ok=True, folder=folder, patches=n, answered=a, moved_to=dest,
+                   note="moved to trash (recoverable). Run Apply changes to drop it "
+                        "from the review set.")
+
+
+@bp.route("/admin/data/delete_cohort", methods=["POST"])
+def delete_cohort_data():
+    """Soft-delete ALL top-level folders that map to a cohort (e.g. every folder
+    matching the cohort's patterns). Moves them to trash; optionally also removes
+    the cohort definition. Takes effect at the next Apply."""
+    _require_admin()
+    if _busy():
+        return jsonify(error="a rebuild/preview is running — wait for it to finish"), 409
+    data = request.get_json(force=True) or {}
+    name = (data.get("cohort") or "").strip()
+    if name not in (_APP.CFG.get("cohorts") or {}):
+        return jsonify(error="unknown cohort '%s'" % name), 400
+    targets = [f for f in _slide_folders() if _APP.cohort_for(f, _APP.CFG) == name]
+    if not targets:
+        return jsonify(error="no folders on disk currently map to cohort '%s'" % name), 404
+    answered = _answered_patch_ids()
+    n = a = 0
+    for f in targets:
+        fn, fa = _folder_impact(f, answered); n += fn; a += fa
+    deleted, errors = [], []
+    for f in targets:
+        try:
+            _trash_folder(f); deleted.append(f)
+        except Exception as e:
+            errors.append("%s: %s" % (f, e))
+    if data.get("remove_definition"):
+        with _APP._lock:
+            fresh = _APP.load_config()
+            (fresh.get("cohorts") or {}).pop(name, None)
+            for r in list(fresh.get("rater_cohorts") or {}):
+                fresh["rater_cohorts"][r] = [c for c in fresh["rater_cohorts"][r] if c != name]
+                if not fresh["rater_cohorts"][r]:
+                    fresh["rater_cohorts"].pop(r, None)
+            _APP.save_config(fresh)
+    return jsonify(ok=True, cohort=name, deleted=deleted, errors=errors,
+                   patches=n, answered=a,
+                   note="moved %d folder(s) to trash (recoverable). Run Apply changes "
+                        "to drop them from the review set." % len(deleted))
+
+
+# --------------------------------------------------------------------------
 # UPLOAD — a cohort, ONE SLIDE PER REQUEST (each under the Cloudflare 100 MB cap)
 #
 # The browser picks a cohort folder and POSTs one request per slide (multipart:
